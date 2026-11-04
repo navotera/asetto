@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAsset, useCategories, useCustodians, useDeleteAsset, useCan } from '@/api/queries';
+import { useAsset, useAssetPhotos, useCategories, useCustodians, useDeleteAsset, useCan } from '@/api/queries';
 import { PageHeader, Button, Card, CardHeader, LoadingBlock, EmptyState, Input, Spinner } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/Modal';
 import { ConditionBadge, AssetStatusBadge } from '@/components/ui/badges';
@@ -20,6 +20,13 @@ const methodLabels: Record<Asset['method'], string> = {
   straight_line: 'Garis Lurus',
   declining_balance: 'Saldo Menurun',
   none: 'Tanpa Depresiasi',
+};
+
+const conditionLabels: Record<Asset['condition'], string> = {
+  good: 'Baik',
+  needs_repair: 'Perlu Perbaikan',
+  broken: 'Rusak',
+  idle: 'Tidak Terpakai',
 };
 
 const TABS = [
@@ -47,6 +54,7 @@ export default function AssetDetailPage() {
   const { data: asset, isLoading, isError } = useAsset(id);
   const { data: categories } = useCategories();
   const { data: custodians } = useCustodians();
+  const { data: photos } = useAssetPhotos(id);
   const navigate = useNavigate();
   const del = useDeleteAsset();
   const toast = useToast();
@@ -92,6 +100,22 @@ export default function AssetDetailPage() {
   const categoryName = categories?.find((c) => c.id === asset.category_id)?.name ?? '—';
   const custodian = custodians?.find((c) => c.id === asset.custodian_id);
 
+  // Newest photo from the Foto tab + general info condensed to a single line.
+  const lastPhoto = photos && photos.length
+    ? [...photos].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]
+    : null;
+  const summaryLine = [
+    asset.code,
+    categoryName,
+    conditionLabels[asset.condition],
+    custodian ? custodian.name : 'Tanpa penanggung jawab',
+    asset.location || null,
+    asset.serial_number || null,
+    `Perolehan ${formatDate(asset.acquisition_date)}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <div>
       <div className="mb-4">
@@ -132,6 +156,32 @@ export default function AssetDetailPage() {
 
       {tab === 'ringkasan' && (
         <div>
+          {/* Foto terakhir (kiri) + metadata Informasi Umum satu baris (kanan). */}
+          <Card className="mb-4">
+            <div className="flex items-center gap-4 px-4 py-3">
+              <button
+                onClick={() => setTab('foto')}
+                className="shrink-0 overflow-hidden rounded-lg border border-border-soft"
+                title="Buka tab Foto"
+              >
+                {lastPhoto?.thumb_url || lastPhoto?.url ? (
+                  <img
+                    src={(lastPhoto.thumb_url ?? lastPhoto.url) as string}
+                    alt="Foto terakhir"
+                    className="h-16 w-16 object-cover"
+                  />
+                ) : (
+                  <span className="flex h-16 w-16 items-center justify-center bg-page-bg text-[10px] font-medium text-text-muted">
+                    Foto
+                  </span>
+                )}
+              </button>
+              <p className="min-w-0 flex-1 truncate text-sm text-text-default" title={summaryLine}>
+                {summaryLine}
+              </p>
+            </div>
+          </Card>
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader title="Informasi Umum" />

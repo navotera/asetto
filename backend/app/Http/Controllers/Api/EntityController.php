@@ -37,11 +37,36 @@ class EntityController extends Controller
 
         $tenant = Tenant::query()->first() ?? Tenant::query()->create(['name' => 'Default', 'slug' => 'default']);
         $entity = Entity::query()->create([
-            'id' => (string) Str::ulid(),
+            'id' => $this->makeEntityId($data['name']),
             'name' => $data['name'],
             'tenant_id' => $tenant->id,
         ]);
 
         return response()->json(['id' => $entity->id, 'name' => $entity->name], 201);
+    }
+
+    /**
+     * A human-readable, unique entity id derived from the name — e.g.
+     * "PT Guna Dharma" → "ent_guna_dharma_x7k2". Kept within the 26-char id
+     * column (rbac entities.id is a ULID column), so the slug is capped and a
+     * short random suffix keeps it unique.
+     */
+    private function makeEntityId(string $name): string
+    {
+        $slug = Str::of($name)
+            ->lower()
+            ->replaceMatches('/\b(pt|cv|ud|pd|tbk|persero)\b\.?/u', ' ') // drop legal-form words
+            ->replaceMatches('/[^a-z0-9]+/', '_')
+            ->trim('_')
+            ->limit(17, '')
+            ->trim('_')
+            ->value();
+        $slug = $slug !== '' ? $slug : 'entitas';
+
+        do {
+            $id = 'ent_'.$slug.'_'.Str::lower(Str::random(4));
+        } while (Entity::query()->whereKey($id)->exists());
+
+        return $id;
     }
 }

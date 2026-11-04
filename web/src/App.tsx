@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/shell/AppShell';
 import { ToastProvider } from './components/ui/toast';
+import { ActiveEntityProvider } from './hooks/useActiveEntity';
 import { useCan } from './api/queries';
 import DashboardPage from './pages/DashboardPage';
 import MyAssetsPage from './pages/MyAssetsPage';
@@ -27,7 +28,8 @@ function Landing() {
 export default function App() {
   return (
     <ToastProvider>
-      <AppShell>
+      <ActiveEntityProvider>
+        <AppShell>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/aset-saya" element={<MyAssetsPage />} />
@@ -43,8 +45,9 @@ export default function App() {
           <Route path="/laporan/nilai-buku" element={<BookValueReportPage />} />
           <Route path="/pengaturan" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AppShell>
+          </Routes>
+        </AppShell>
+      </ActiveEntityProvider>
     </ToastProvider>
   );
 }

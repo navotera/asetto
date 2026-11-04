@@ -33,12 +33,27 @@ function clamp(v: number, min: number, max: number) {
 // Seed data
 // ---------------------------------------------------------------------------
 
-// Companies the assets belong to. The id is the shared Ecopa/Akunta entity
-// ULID, so journals land in the right entity in Akunta.
+// Companies the assets belong to. The id is Asetto's own, human-readable slug
+// (e.g. "PT Guna Dharma" → ent_guna_dharma_x7k2); Akunta maps it via Auto Mapping.
 const entities: Entity[] = [
-  { id: 'ent_pt_a', name: 'PT Asetto Nusantara' },
-  { id: 'ent_pt_b', name: 'PT Mitra Sejahtera' },
+  { id: 'ent_asetto_nusantara', name: 'PT Asetto Nusantara' },
+  { id: 'ent_mitra_sejahtera', name: 'PT Mitra Sejahtera' },
 ];
+
+/** Readable, unique entity id derived from the name — mirrors the backend. */
+function entitySlugId(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/\b(pt|cv|ud|pd|tbk|persero)\b\.?/g, ' ') // drop legal-form words
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const slug = (base || 'entitas').slice(0, 24).replace(/_+$/, '');
+  let candidate = `ent_${slug}_${Math.random().toString(36).slice(2, 6)}`;
+  while (entities.some((e) => e.id === candidate)) {
+    candidate = `ent_${slug}_${Math.random().toString(36).slice(2, 6)}`;
+  }
+  return candidate;
+}
 
 const categories: AssetCategory[] = [
   { id: 'cat_kendaraan', code: 'KND', name: 'Kendaraan', default_method: 'straight_line', default_useful_life_months: 96 },
@@ -92,7 +107,7 @@ const assets: Asset[] = [
     id: 'ast_2',
     code: 'AST-0002',
     name: 'MacBook Pro 14 M3',
-    entity_id: 'ent_pt_b',
+    entity_id: 'ent_mitra_sejahtera',
     category_id: 'cat_komputer',
     acquisition_date: '2024-06-01',
     acquisition_cost: 38_000_000,
@@ -143,7 +158,7 @@ const assets: Asset[] = [
     id: 'ast_5',
     code: 'AST-0005',
     name: 'Server Dell PowerEdge R760',
-    entity_id: 'ent_pt_b',
+    entity_id: 'ent_mitra_sejahtera',
     category_id: 'cat_komputer',
     acquisition_date: '2025-01-05',
     acquisition_cost: 95_000_000,
@@ -423,6 +438,12 @@ export const db = {
   categories: () => categories.map((c) => ({ ...c, asset_count: assets.filter((a) => a.category_id === c.id).length })),
   custodians: () => custodians,
   entities: () => entities,
+  createEntity(input: { name?: string }): Entity {
+    const name = input.name?.trim() || 'Entitas Baru';
+    const e: Entity = { id: entitySlugId(name), name };
+    entities.push(e);
+    return e;
+  },
 
   createCategory(input: Partial<AssetCategory>): AssetCategory {
     const c: AssetCategory = {

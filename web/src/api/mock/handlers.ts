@@ -35,6 +35,7 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   }
   if (m === 'GET' && path === '/custodians') return db.custodians();
   if (m === 'GET' && path === '/entities') return db.entities();
+  if (m === 'POST' && path === '/entities') return db.createEntity(body);
 
   if (m === 'GET' && path === '/assets') return db.listAssets();
   if (m === 'GET' && path === '/assets/mine') return db.myAssets();

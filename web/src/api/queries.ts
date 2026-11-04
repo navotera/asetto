@@ -171,6 +171,14 @@ export function useDeleteCategory() {
 export const useEntities = () =>
   useQuery({ queryKey: keys.entities, queryFn: () => api.get<Entity[]>('/entities') });
 
+export function useSaveEntity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string }) => api.post<Entity>('/entities', input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.entities }),
+  });
+}
+
 export const useCustodians = () =>
   useQuery({ queryKey: keys.custodians, queryFn: () => api.get<Custodian[]>('/custodians') });
 

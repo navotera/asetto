@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { UserRolesPanel } from './settings/UserRolesPanel';
 import { RoleMatrixPanel } from './settings/RoleMatrixPanel';
 import { CustodianLinkPanel } from './settings/CustodianLinkPanel';
+import { EntitiesPanel } from './settings/EntitiesPanel';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -27,6 +28,7 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { id: 'profil', label: 'Profil Pengguna', description: 'Identitas dari Ecopa', icon: '◉' },
+  { id: 'entitas', label: 'Entitas', description: 'Perusahaan (PT) & jurnal', icon: '◫', adminOnly: true },
   { id: 'depresiasi', label: 'Depresiasi Terjadwal', description: 'Mode posting otomatis', icon: '↘', adminOnly: true },
   { id: 'penyimpanan', label: 'Penyimpanan File', description: 'Disk foto & bukti', icon: '▤', adminOnly: true },
   { id: 'users', label: 'User & Roles', description: 'Assign role & impersonate', icon: '♙', adminOnly: true },
@@ -75,7 +77,7 @@ export default function SettingsPage() {
                     isActive ? 'bg-primary-light' : 'hover:bg-primary-light/60',
                   )}
                 >
-                  <span className={cn('mt-0.5 w-4 text-center text-base', isActive ? 'text-primary' : 'text-text-muted')}>
+                  <span aria-hidden="true" className={cn('mt-0.5 w-4 text-center text-base', isActive ? 'text-primary' : 'text-text-muted')}>
                     {s.icon}
                   </span>
                   <span className="min-w-0">
@@ -142,6 +144,7 @@ export default function SettingsPage() {
             </Card>
           )}
 
+          {current?.id === 'entitas' && <EntitiesPanel />}
           {current?.id === 'users' && <UserRolesPanel />}
           {current?.id === 'roles' && <RoleMatrixPanel />}
           {current?.id === 'custodian' && <CustodianLinkPanel />}

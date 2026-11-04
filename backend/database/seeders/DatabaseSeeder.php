@@ -13,7 +13,6 @@ use App\Models\AssetCategory;
 use App\Models\Custodian;
 use App\Services\SettingsService;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 /**
  * Seeds reference + sample asset data that mirrors web/src/api/mock/db.ts, so
@@ -42,7 +41,7 @@ class DatabaseSeeder extends Seeder
         $tenant = Tenant::query()->firstOrCreate(['slug' => 'default'], ['name' => 'Default']);
         $entity = Entity::query()->firstOrCreate(
             ['name' => 'PT Contoh Asetto'],
-            ['id' => (string) Str::ulid(), 'tenant_id' => $tenant->id],
+            ['id' => 'ent_contoh_asetto', 'tenant_id' => $tenant->id],
         );
 
         $categories = [

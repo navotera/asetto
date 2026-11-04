@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAssets, useCategories, useCustodians, useCan } from '@/api/queries';
+import { useActiveEntity } from '@/hooks/useActiveEntity';
 import { PageHeader, Button, Card, Input, Select, LoadingBlock, EmptyState } from '@/components/ui/primitives';
 import { ConditionBadge, AssetStatusBadge } from '@/components/ui/badges';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
@@ -22,6 +23,7 @@ export default function AssetsPage() {
   const { data: categories } = useCategories();
   const { data: custodians } = useCustodians();
   const { can } = useCan();
+  const { activeEntityId } = useActiveEntity();
   const showValues = can('asset.view_value');
   const canManage = can('asset.manage');
 
@@ -67,6 +69,7 @@ export default function AssetsPage() {
 
   const rows = useMemo(() => {
     const filtered = (assets ?? []).filter((a) => {
+      if (activeEntityId && a.entity_id !== activeEntityId) return false;
       if (categoryFilter && a.category_id !== categoryFilter) return false;
       if (statusFilter && a.status !== statusFilter) return false;
       if (conditionFilter && a.condition !== conditionFilter) return false;
@@ -84,7 +87,7 @@ export default function AssetsPage() {
       return sortDir === 'asc' ? r : -r;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assets, search, categoryFilter, statusFilter, conditionFilter, custodianFilter, sortKey, sortDir, categories, custodians]);
+  }, [assets, activeEntityId, search, categoryFilter, statusFilter, conditionFilter, custodianFilter, sortKey, sortDir, categories, custodians]);
 
   function SortTh({ label, k, align }: { label: string; k: SortKey; align?: 'right' | 'center' }) {
     const active = sortKey === k;
@@ -108,13 +111,14 @@ export default function AssetsPage() {
             <button
               onClick={() => setFilterOpen((v) => !v)}
               className="relative flex h-9 items-center gap-2 rounded-lg border border-border-default px-3 text-sm font-semibold text-text-default hover:bg-primary-light"
-              title="Filter"
+              aria-expanded={filterOpen}
+              aria-label={hasFilter ? 'Filter (sedang aktif)' : 'Filter'}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
               Filter
-              {hasFilter && <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-danger" />}
+              {hasFilter && <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-danger" />}
             </button>
             {canManage && <Button onClick={() => setModalOpen(true)}>+ Tambah Aset</Button>}
           </div>

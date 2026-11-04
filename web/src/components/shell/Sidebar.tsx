@@ -26,7 +26,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       style={{ background: 'var(--a-sidebar-gradient)' }}
     >
       <div className="flex h-16 items-center gap-2.5 px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-base font-black text-white shadow-sm">
+        <div aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-base font-black text-white shadow-sm">
           A
         </div>
         <div className="leading-tight">
@@ -56,7 +56,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
                         : 'text-text-default hover:bg-primary-light hover:text-primary',
                     )}
                   >
-                    <span className={cn('w-4 text-center text-base', active ? 'text-white' : 'text-text-muted')}>
+                    <span aria-hidden="true" className={cn('w-4 text-center text-base', active ? 'text-white' : 'text-text-muted')}>
                       {item.icon}
                     </span>
                     {item.label}

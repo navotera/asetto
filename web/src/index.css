@@ -94,3 +94,53 @@ body {
   background: var(--a-border);
   border-radius: 999px;
 }
+
+/*
+ * Accessibility baseline (ui-ux-pro-max: focus-states, reduced-motion,
+ * cursor-pointer, tap-delay). Applied globally so every control inherits it
+ * without per-component churn.
+ */
+
+/* Visible keyboard focus ring on every interactive element (3:1 non-text
+ * contrast via the teal primary). Hidden for mouse/touch via :focus-visible. */
+:where(a, button, [role='button'], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--a-primary);
+  outline-offset: 2px;
+}
+:where(a, button, [role='button'], summary):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Clickable affordance + remove the 300ms touch tap delay. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+a[href],
+label[for],
+summary {
+  cursor: pointer;
+}
+button,
+a,
+[role='button'],
+input,
+select,
+textarea,
+label,
+summary {
+  touch-action: manipulation;
+}
+:disabled {
+  cursor: not-allowed;
+}
+
+/* Honor the user's reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

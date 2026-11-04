@@ -4,6 +4,7 @@ import { useMe } from '@/api/queries';
 import { api } from '@/api/client';
 import { useColorMode, setColorMode } from '@/hooks/useColorMode';
 import { navGroups } from './nav';
+import { EntitySwitcher } from './EntitySwitcher';
 
 function currentTitle(pathname: string): string {
   for (const g of navGroups) {
@@ -38,6 +39,7 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
             MODE MOCK
           </span>
         )}
+        <EntitySwitcher />
         <UserMenu name={me?.name ?? '—'} email={me?.email} role={me?.role ?? me?.roles?.[0] ?? 'Pengguna'} />
       </div>
     </header>
@@ -63,15 +65,18 @@ function UserMenu({ name, email, role }: { name: string; email?: string; role: s
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2.5 rounded-lg border border-border-soft px-2.5 py-1.5 hover:bg-primary-light"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Menu akun — ${name}`}
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+        <div aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
           {name.slice(0, 1)}
         </div>
         <div className="hidden leading-tight text-left sm:block">
           <div className="text-xs font-semibold text-text-strong">{name}</div>
           <div className="text-[10px] text-text-muted">{role}</div>
         </div>
-        <span className="text-[10px] text-text-muted">▾</span>
+        <span aria-hidden="true" className="text-[10px] text-text-muted">▾</span>
       </button>
 
       {open && (
