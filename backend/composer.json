@@ -12,6 +12,7 @@
         "akunta/core": "@dev",
         "akunta/ecopa-client": "@dev",
         "akunta/rbac": "@dev",
+        "intervention/image": "^3.11",
         "laravel/framework": "^11.31",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.9"

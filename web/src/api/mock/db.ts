@@ -1,11 +1,12 @@
 /**
  * In-browser mock database for the Asetto SPA.
  *
- * It intentionally models the *real* flow: a depreciation run produces a
- * balanced journal that an Asetto backend would push to Akunta server-to-server
- * (via the PHP `api-client`). Here that push lands in an in-memory "outbox" with
- * an idempotency key, so the whole depreciation → jurnal-ke-Akunta path is
- * visible without a backend.
+ * It mirrors the *real* flow: an economic event (acquisition, depreciation,
+ * disposal) is emitted to Akunta's Auto Mapping ingest as raw business JSON —
+ * NO account codes; the Akunta admin maps fields → accounts once per
+ * `source_type`. Here that ingest lands in an in-memory "outbox" with an
+ * idempotency key (queued → accepted), so the whole flow is visible without a
+ * backend.
  */
 import type {
   Asset,
@@ -16,8 +17,8 @@ import type {
   DepreciationRun,
   Disposal,
   DisposalType,
+  Entity,
   JournalEntry,
-  JournalLine,
   Me,
 } from '../types';
 
@@ -32,47 +33,18 @@ function clamp(v: number, min: number, max: number) {
 // Seed data
 // ---------------------------------------------------------------------------
 
+// Companies the assets belong to. The id is the shared Ecopa/Akunta entity
+// ULID, so journals land in the right entity in Akunta.
+const entities: Entity[] = [
+  { id: 'ent_pt_a', name: 'PT Asetto Nusantara' },
+  { id: 'ent_pt_b', name: 'PT Mitra Sejahtera' },
+];
+
 const categories: AssetCategory[] = [
-  {
-    id: 'cat_kendaraan',
-    code: 'KND',
-    name: 'Kendaraan',
-    default_method: 'straight_line',
-    default_useful_life_months: 96,
-    akunta_asset_account: '1-30003',
-    akunta_accum_dep_account: '1-30903',
-    akunta_dep_expense_account: '6-20003',
-  },
-  {
-    id: 'cat_komputer',
-    code: 'KMP',
-    name: 'Komputer & IT',
-    default_method: 'declining_balance',
-    default_useful_life_months: 48,
-    akunta_asset_account: '1-30002',
-    akunta_accum_dep_account: '1-30902',
-    akunta_dep_expense_account: '6-20002',
-  },
-  {
-    id: 'cat_mebel',
-    code: 'MBL',
-    name: 'Mebel & Perlengkapan',
-    default_method: 'straight_line',
-    default_useful_life_months: 60,
-    akunta_asset_account: '1-30001',
-    akunta_accum_dep_account: '1-30901',
-    akunta_dep_expense_account: '6-20001',
-  },
-  {
-    id: 'cat_mesin',
-    code: 'MSN',
-    name: 'Mesin Produksi',
-    default_method: 'straight_line',
-    default_useful_life_months: 120,
-    akunta_asset_account: '1-30004',
-    akunta_accum_dep_account: '1-30904',
-    akunta_dep_expense_account: '6-20004',
-  },
+  { id: 'cat_kendaraan', code: 'KND', name: 'Kendaraan', default_method: 'straight_line', default_useful_life_months: 96 },
+  { id: 'cat_komputer', code: 'KMP', name: 'Komputer & IT', default_method: 'declining_balance', default_useful_life_months: 48 },
+  { id: 'cat_mebel', code: 'MBL', name: 'Mebel & Perlengkapan', default_method: 'straight_line', default_useful_life_months: 60 },
+  { id: 'cat_mesin', code: 'MSN', name: 'Mesin Produksi', default_method: 'straight_line', default_useful_life_months: 120 },
 ];
 
 const custodians: Custodian[] = [
@@ -83,34 +55,15 @@ const custodians: Custodian[] = [
   { id: 'cus_sari', type: 'person', code: 'EMP-0048', name: 'Sari Wijaya', department: 'Teknologi' },
 ];
 
-/** Account display names so journals read nicely without a real COA service. */
-const accountNames: Record<string, string> = {
-  '1-10001': 'Kas & Bank',
-  '1-30001': 'Mebel & Perlengkapan',
-  '1-30002': 'Komputer & Peralatan IT',
-  '1-30003': 'Kendaraan',
-  '1-30004': 'Mesin Produksi',
-  '1-30901': 'Akum. Depresiasi — Mebel',
-  '1-30902': 'Akum. Depresiasi — Komputer',
-  '1-30903': 'Akum. Depresiasi — Kendaraan',
-  '1-30904': 'Akum. Depresiasi — Mesin',
-  '6-20001': 'Beban Depresiasi — Mebel',
-  '6-20002': 'Beban Depresiasi — Komputer',
-  '6-20003': 'Beban Depresiasi — Kendaraan',
-  '6-20004': 'Beban Depresiasi — Mesin',
-  '8-10001': 'Laba Pelepasan Aset',
-  '9-10001': 'Rugi Pelepasan Aset',
-};
-const accountName = (code: string) => accountNames[code] ?? code;
-
 function seedAsset(
-  partial: Omit<Asset, 'accumulated_depreciation' | 'book_value' | 'status' | 'last_depreciated_period'> &
-    Partial<Pick<Asset, 'accumulated_depreciation' | 'last_depreciated_period'>>,
+  partial: Omit<Asset, 'accumulated_depreciation' | 'book_value' | 'status' | 'last_depreciated_period' | 'entity_id'> &
+    Partial<Pick<Asset, 'accumulated_depreciation' | 'last_depreciated_period' | 'entity_id'>>,
 ): Asset {
   const accumulated = partial.accumulated_depreciation ?? 0;
   return {
     status: 'active',
     last_depreciated_period: null,
+    entity_id: entities[0].id,
     ...partial,
     accumulated_depreciation: accumulated,
     book_value: partial.acquisition_cost - accumulated,
@@ -139,6 +92,7 @@ const assets: Asset[] = [
     id: 'ast_2',
     code: 'AST-0002',
     name: 'MacBook Pro 14 M3',
+    entity_id: 'ent_pt_b',
     category_id: 'cat_komputer',
     acquisition_date: '2024-06-01',
     acquisition_cost: 38_000_000,
@@ -189,6 +143,7 @@ const assets: Asset[] = [
     id: 'ast_5',
     code: 'AST-0005',
     name: 'Server Dell PowerEdge R760',
+    entity_id: 'ent_pt_b',
     category_id: 'cat_komputer',
     acquisition_date: '2025-01-05',
     acquisition_cost: 95_000_000,
@@ -224,12 +179,53 @@ const runs: DepreciationRun[] = [];
 const disposals: Disposal[] = [];
 const journals: JournalEntry[] = [];
 
+// --- asset control center (mock, in-memory) ---
+const custodyHistory: Record<string, any[]> = {};
+const assetPhotos: Record<string, any[]> = {};
+const assetPurchases: Record<string, any> = {};
+const settings = { mode: 'auto_post' as 'auto_post' | 'draft', disk: 'public', disks: ['public', 's3'] };
+
+const custodianNameById = (id: string | null) => custodians.find((c) => c.id === id)?.name ?? null;
+
+const assetAudit: Record<string, any[]> = {};
+function auditPush(assetId: string, action: string, description: string) {
+  (assetAudit[assetId] ??= []).push({
+    id: id('aud'),
+    action,
+    description,
+    actor_name: 'Dede Nugroho',
+    created_at: new Date().toISOString(),
+  });
+}
+
+const PERMISSION_CATALOG = [
+  { code: 'asset.read', group: 'Aset', label: 'Lihat daftar & detail aset' },
+  { code: 'asset.read_own', group: 'Aset', label: 'Lihat aset tanggung jawab sendiri' },
+  { code: 'asset.view_value', group: 'Aset', label: 'Lihat nilai & angka aset' },
+  { code: 'asset.manage', group: 'Aset', label: 'Kelola aset' },
+  { code: 'disposal.manage', group: 'Aset', label: 'Pelepasan & penjualan aset' },
+  { code: 'depreciation.run', group: 'Depresiasi', label: 'Jalankan & setujui depresiasi' },
+  { code: 'journal.read', group: 'Integrasi', label: 'Lihat outbox jurnal Akunta' },
+  { code: 'settings.manage', group: 'Pengaturan', label: 'Kelola pengaturan, role, & custodian' },
+];
+const ALL_CODES = PERMISSION_CATALOG.map((p) => p.code);
+
 const me: Me = {
   id: 'usr_1',
   name: 'Dede Nugroho',
   email: 'dede.nugroho@leconfe.com',
   app_role: 'admin',
-  roles: ['Asset Manager'],
+  roles: ['Admin'],
+  role: 'Admin',
+  permissions: ALL_CODES,
+  is_impersonating: false,
+  impersonator: null,
+};
+
+// Mock role-permission state (admin bypasses — shown as all).
+const rolePerms: Record<string, string[]> = {
+  asset_manager: ['asset.read', 'asset.view_value', 'asset.manage', 'disposal.manage', 'depreciation.run', 'journal.read'],
+  asset_user: ['asset.read_own'],
 };
 
 // ---------------------------------------------------------------------------
@@ -295,56 +291,94 @@ function buildRunLines(period: string): DepreciationLine[] {
   return lines;
 }
 
-function buildDepreciationJournal(run: DepreciationRun): JournalEntry {
-  // Group amounts by category so each category hits its own GL accounts.
-  const byCategory = new Map<string, number>();
-  for (const line of run.lines) {
-    const asset = assets.find((a) => a.id === line.asset_id)!;
-    byCategory.set(asset.category_id, (byCategory.get(asset.category_id) ?? 0) + line.amount);
-  }
-  const jlines: JournalLine[] = [];
-  for (const [categoryId, amount] of byCategory) {
-    const cat = categories.find((c) => c.id === categoryId)!;
-    jlines.push({
-      account_code: cat.akunta_dep_expense_account,
-      account_name: accountName(cat.akunta_dep_expense_account),
-      debit: amount,
-      credit: 0,
-    });
-    jlines.push({
-      account_code: cat.akunta_accum_dep_account,
-      account_name: accountName(cat.akunta_accum_dep_account),
-      debit: 0,
-      credit: amount,
-    });
-  }
+const entityName = (entityId: string) => entities.find((e) => e.id === entityId)?.name ?? entityId;
+
+/** Create an outbox event (Auto Mapping ingest payload) and try to deliver it. */
+function emitEvent(
+  e: {
+    source: JournalEntry['source'];
+    source_type: string;
+    source_ref: string;
+    entity_id: string;
+    idempotency_key: string;
+    date: string;
+    memo: string;
+    payload: Record<string, unknown>;
+  },
+  forceOk = false,
+): JournalEntry {
   const now = new Date().toISOString();
-  const [y, m] = run.period.split('-').map(Number);
-  return {
+  const journal: JournalEntry = {
     id: id('jrn'),
-    idempotency_key: `dep:${run.period}`,
-    source: 'depreciation',
-    source_ref: run.id,
-    date: new Date(y, m, 0).toISOString().slice(0, 10), // last day of the period
-    memo: `Beban depresiasi periode ${run.period}`,
+    idempotency_key: e.idempotency_key,
+    source: e.source,
+    source_type: e.source_type,
+    source_ref: e.source_ref,
+    entity_id: e.entity_id,
+    date: e.date,
+    memo: e.memo,
     status: 'queued',
-    akunta_journal_no: null,
-    lines: jlines,
+    akunta_raw_id: null,
+    payload: e.payload,
+    last_error: null,
     created_at: now,
     posted_at: null,
   };
+  pushToAkunta(journal, forceOk);
+  journals.push(journal);
+  return journal;
 }
 
-/** Simulate the server-to-server push to Akunta. ~1 in 12 queued pushes "fail"
- *  so the retry UI has something to show; retry always succeeds. */
+/** One depreciation event per (entity × category), mirroring the backend. */
+function emitDepreciationEvents(run: DepreciationRun) {
+  const byGroup = new Map<string, { entity_id: string; category: AssetCategory; amount: number }>();
+  for (const line of run.lines) {
+    const asset = assets.find((a) => a.id === line.asset_id)!;
+    const category = categories.find((c) => c.id === asset.category_id)!;
+    const key = `${asset.entity_id}|${category.id}`;
+    const g = byGroup.get(key) ?? { entity_id: asset.entity_id, category, amount: 0 };
+    g.amount += line.amount;
+    byGroup.set(key, g);
+  }
+  const [y, m] = run.period.split('-').map(Number);
+  const date = new Date(y, m, 0).toISOString().slice(0, 10); // last day of the period
+  for (const g of byGroup.values()) {
+    if (g.amount <= 0) continue;
+    const memo = `Depresiasi ${g.category.name} periode ${run.period}`;
+    emitEvent({
+      source: 'depreciation',
+      source_type: 'asetto.depreciation',
+      source_ref: run.id,
+      entity_id: g.entity_id,
+      idempotency_key: `asetto:dep:${g.entity_id}:${run.period}:${g.category.code}`,
+      date,
+      memo,
+      payload: {
+        event: 'depreciation',
+        period: run.period,
+        category_code: g.category.code,
+        category_name: g.category.name,
+        entity: entityName(g.entity_id),
+        date,
+        amount: g.amount,
+        memo,
+      },
+    });
+  }
+}
+
+/** Simulate ingest to Akunta. ~1 in 12 queued pushes "fail" so the retry UI has
+ *  something to show; retry always succeeds (202 → accepted + raw_id). */
 function pushToAkunta(journal: JournalEntry, forceOk = false) {
   const ok = forceOk || Math.random() > 0.08;
   if (ok) {
-    journal.status = 'posted';
-    journal.akunta_journal_no = `AKT-JV-${new Date().getFullYear()}-${String(seq).padStart(5, '0')}`;
+    journal.status = 'accepted';
+    journal.akunta_raw_id = `raw_${new Date().getFullYear()}_${String(++seq).padStart(5, '0')}`;
+    journal.last_error = null;
     journal.posted_at = new Date().toISOString();
   } else {
     journal.status = 'failed';
+    journal.last_error = 'Akunta tidak merespons (simulasi offline).';
   }
 }
 
@@ -374,7 +408,7 @@ function dashboard(): DashboardSummary {
     disposed_this_year: disposals.filter((d) => new Date(d.date).getFullYear() === thisYear).length,
     condition_breakdown: conditionBreakdown,
     pending_depreciation_period: pendingPeriod(),
-    akunta_queued: journals.filter((j) => j.status !== 'posted').length,
+    akunta_queued: journals.filter((j) => j.status !== 'accepted').length,
     recent_journals: [...journals].reverse().slice(0, 5),
     book_value_by_category: [...byCat.entries()].map(([category, book_value]) => ({ category, book_value })),
   };
@@ -386,9 +420,35 @@ function dashboard(): DashboardSummary {
 
 export const db = {
   me: () => me,
-  categories: () => categories,
+  categories: () => categories.map((c) => ({ ...c, asset_count: assets.filter((a) => a.category_id === c.id).length })),
   custodians: () => custodians,
-  accountName,
+  entities: () => entities,
+
+  createCategory(input: Partial<AssetCategory>): AssetCategory {
+    const c: AssetCategory = {
+      id: id('cat'),
+      code: input.code || `CAT-${categories.length + 1}`,
+      name: input.name || 'Kategori Baru',
+      default_method: input.default_method || 'straight_line',
+      default_useful_life_months: input.default_useful_life_months ?? 60,
+    };
+    categories.push(c);
+    return c;
+  },
+  updateCategory(categoryId: string, input: Partial<AssetCategory>): AssetCategory {
+    const c = categories.find((x) => x.id === categoryId);
+    if (!c) throw new ApiMockError(404, 'Kategori tidak ditemukan');
+    Object.assign(c, input);
+    return c;
+  },
+  deleteCategory(categoryId: string) {
+    if (assets.some((a) => a.category_id === categoryId)) {
+      throw new ApiMockError(422, 'Kategori masih dipakai aset — tidak dapat dihapus.');
+    }
+    const i = categories.findIndex((x) => x.id === categoryId);
+    if (i !== -1) categories.splice(i, 1);
+    return { ok: true };
+  },
 
   listAssets: () => [...assets].sort((a, b) => a.code.localeCompare(b.code)),
   getAsset: (assetId: string) => assets.find((a) => a.id === assetId) ?? null,
@@ -399,6 +459,7 @@ export const db = {
       id: id('ast'),
       code: input.code || `AST-${String(n).padStart(4, '0')}`,
       name: input.name || 'Aset Baru',
+      entity_id: input.entity_id || entities[0].id,
       category_id: input.category_id || categories[0].id,
       acquisition_date: input.acquisition_date || new Date().toISOString().slice(0, 10),
       acquisition_cost: input.acquisition_cost ?? 0,
@@ -412,6 +473,7 @@ export const db = {
       notes: input.notes,
     });
     assets.push(asset);
+    auditPush(asset.id, 'created', 'Aset dibuat.');
     return asset;
   },
 
@@ -420,6 +482,7 @@ export const db = {
     if (!asset) throw new ApiMockError(404, 'Aset tidak ditemukan');
     Object.assign(asset, input);
     asset.book_value = asset.acquisition_cost - asset.accumulated_depreciation;
+    auditPush(asset.id, 'updated', 'Data aset diperbarui.');
     return asset;
   },
 
@@ -436,15 +499,183 @@ export const db = {
     const asset = assets.find((a) => a.id === assetId);
     if (!asset) throw new ApiMockError(404, 'Aset tidak ditemukan');
     asset.condition = condition;
+    auditPush(asset.id, 'condition', `Kondisi diubah menjadi ${condition}.`);
     return asset;
   },
 
-  reassign(assetId: string, custodianId: string | null, location?: string): Asset {
+  reassign(assetId: string, body: { custodian_id?: string | null; location?: string; condition_at_handover?: Asset['condition']; notes?: string }): Asset {
     const asset = assets.find((a) => a.id === assetId);
     if (!asset) throw new ApiMockError(404, 'Aset tidak ditemukan');
+
+    const custodianId = body.custodian_id ?? null;
+    (custodyHistory[assetId] ??= []).push({
+      id: id('hov'),
+      from_custodian_id: asset.custodian_id,
+      from_custodian_name: custodianNameById(asset.custodian_id),
+      to_custodian_id: custodianId,
+      to_custodian_name: custodianNameById(custodianId),
+      from_location: asset.location,
+      to_location: body.location ?? asset.location,
+      condition_at_handover: body.condition_at_handover ?? asset.condition,
+      notes: body.notes ?? null,
+      handed_at: new Date().toISOString(),
+    });
+
     asset.custodian_id = custodianId;
-    if (location) asset.location = location;
+    if (body.location) asset.location = body.location;
+    if (body.condition_at_handover) asset.condition = body.condition_at_handover;
+    auditPush(assetId, 'reassigned', `Tanggung jawab dilimpahkan${body.condition_at_handover ? ` · kondisi ${body.condition_at_handover}` : ''}.`);
     return asset;
+  },
+
+  custodyHistory: (assetId: string) => [...(custodyHistory[assetId] ?? [])].reverse(),
+  assetAudit: (assetId: string) => [...(assetAudit[assetId] ?? [])].reverse(),
+
+  // --- photos (ephemeral object URLs) ---
+  listPhotos: (assetId: string) => [...(assetPhotos[assetId] ?? [])].reverse(),
+  addPhoto(assetId: string, body: any) {
+    const file = body.photo;
+    const url = file?.url ?? null;
+    const photo = {
+      id: id('pho'),
+      url,
+      thumb_url: url,
+      caption: body.caption ?? null,
+      width: null,
+      height: null,
+      taken_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    };
+    (assetPhotos[assetId] ??= []).push(photo);
+    auditPush(assetId, 'photo_added', body.caption ? `Foto ditambahkan: ${body.caption}` : 'Foto ditambahkan.');
+    return photo;
+  },
+  deletePhoto(photoId: string) {
+    for (const key of Object.keys(assetPhotos)) {
+      const i = assetPhotos[key].findIndex((p) => p.id === photoId);
+      if (i !== -1) {
+        assetPhotos[key].splice(i, 1);
+        return { ok: true };
+      }
+    }
+    return { ok: true };
+  },
+
+  // --- per-asset depreciation history (derived from runs) ---
+  assetDepreciation(assetId: string) {
+    const entries: any[] = [];
+    for (const run of runs) {
+      const line = run.lines.find((l) => l.asset_id === assetId);
+      if (!line) continue;
+      entries.push({
+        period: run.period,
+        status: run.status,
+        amount: line.amount,
+        book_value_before: line.book_value_before,
+        book_value_after: line.book_value_after,
+        journal_id: run.journal_id,
+        posted_at: run.posted_at,
+      });
+    }
+    return entries.sort((a, b) => (b.period < a.period ? -1 : 1));
+  },
+
+  // --- purchase ---
+  getPurchase: (assetId: string) => assetPurchases[assetId] ?? null,
+  savePurchase(assetId: string, body: any) {
+    const existing = assetPurchases[assetId] ?? { id: id('pur') };
+    const proof = body.proof;
+    const purchase = {
+      ...existing,
+      vendor: body.vendor ?? existing.vendor ?? null,
+      invoice_no: body.invoice_no ?? existing.invoice_no ?? null,
+      purchase_date: body.purchase_date ?? existing.purchase_date ?? null,
+      amount: body.amount !== undefined ? Number(body.amount) : existing.amount ?? 0,
+      notes: body.notes ?? existing.notes ?? null,
+    };
+    if (proof?.url) {
+      const isImage = String(proof.mime ?? '').startsWith('image/');
+      purchase.proof_url = proof.url;
+      purchase.proof_thumb_url = isImage ? proof.url : null;
+      purchase.proof_type = isImage ? 'image' : 'pdf';
+    }
+    assetPurchases[assetId] = purchase;
+    auditPush(assetId, 'purchase', 'Data pembelian diperbarui.');
+
+    // Acquisition event (B) is emitted when purchase data is entered.
+    const asset = assets.find((a) => a.id === assetId);
+    const amount = Number(purchase.amount) || 0;
+    if (asset && amount > 0) {
+      const cat = categories.find((c) => c.id === asset.category_id);
+      const date = purchase.purchase_date ?? asset.acquisition_date;
+      const memo = `Perolehan aset ${asset.code}`;
+      emitEvent({
+        source: 'acquisition',
+        source_type: 'asetto.acquisition',
+        source_ref: asset.id,
+        entity_id: asset.entity_id,
+        idempotency_key: `asetto:acq:${asset.id}`,
+        date,
+        memo,
+        payload: {
+          event: 'acquisition',
+          asset_id: asset.id,
+          asset_code: asset.code,
+          asset_name: asset.name,
+          category_code: cat?.code,
+          date,
+          amount,
+          memo,
+        },
+      });
+    }
+    return purchase;
+  },
+
+  // --- settings ---
+  getSettings: () => ({ ...settings }),
+  saveSettings(patch: Partial<typeof settings>) {
+    if (patch.mode) settings.mode = patch.mode;
+    if (patch.disk) settings.disk = patch.disk;
+    return { ...settings };
+  },
+
+  // --- rbac (mock: the mock user is admin with full access) ---
+  myAssets: () => [],
+  roleManagement: () => ({
+    users: [{
+      assignment_id: 'a1', user_id: 'usr_1', ecopa_user_id: 'ec-1',
+      name: 'Dede Nugroho', email: 'dede.nugroho@leconfe.com', ecopa_role: 'admin',
+      role_id: 'role_admin', role_code: 'admin', role_name: 'Admin',
+      disabled_at: null, can_update_role: false, can_impersonate: false,
+    }],
+    unassigned_users: [],
+    roles: [
+      { id: 'role_admin', code: 'admin', name: 'Admin' },
+      { id: 'role_mgr', code: 'asset_manager', name: 'Asset Manager' },
+      { id: 'role_user', code: 'asset_user', name: 'User' },
+    ],
+  }),
+  assignRole: () => ({ ok: true }),
+  updateAssignment: () => ({ ok: true }),
+  impersonate: () => ({ ok: true }),
+  stopImpersonation: () => ({ ok: true }),
+  permissionMatrix: () => ({
+    catalog: PERMISSION_CATALOG,
+    roles: [
+      { code: 'admin', name: 'Admin', is_preset: true, editable: false, permissions: ALL_CODES },
+      { code: 'asset_manager', name: 'Asset Manager', is_preset: true, editable: true, permissions: rolePerms.asset_manager },
+      { code: 'asset_user', name: 'User', is_preset: true, editable: true, permissions: rolePerms.asset_user },
+    ],
+  }),
+  saveRoleMatrix(roleCode: string, permissions: string[]) {
+    if (rolePerms[roleCode]) rolePerms[roleCode] = permissions;
+    return db.permissionMatrix();
+  },
+  linkCustodian(custodianId: string, userId: string | null) {
+    const c = custodians.find((x) => x.id === custodianId) as any;
+    if (c) c.user_id = userId || null;
+    return c ?? { ok: true };
   },
 
   // --- depreciation ---
@@ -486,12 +717,12 @@ export const db = {
       asset.accumulated_depreciation += line.amount;
       asset.book_value = asset.acquisition_cost - asset.accumulated_depreciation;
       asset.last_depreciated_period = period;
+      auditPush(asset.id, 'depreciation', `Depresiasi ${period}: Rp ${line.amount.toLocaleString('id-ID')}`);
     }
-    // Build + push the journal to Akunta.
-    const journal = buildDepreciationJournal(run);
-    pushToAkunta(journal);
-    journals.push(journal);
-    run.journal_id = journal.id;
+    // Emit one Auto Mapping event per (entity × category) to Akunta.
+    const before = journals.length;
+    emitDepreciationEvents(run);
+    run.journal_id = journals[before]?.id ?? null;
     runs.push(run);
     return run;
   },
@@ -509,50 +740,41 @@ export const db = {
     const gainLoss = proceeds - bookValue;
     const cat = categories.find((c) => c.id === asset.category_id)!;
 
-    // Balanced disposal journal.
-    const lines: JournalLine[] = [
-      {
-        account_code: cat.akunta_accum_dep_account,
-        account_name: accountName(cat.akunta_accum_dep_account),
-        debit: asset.accumulated_depreciation,
-        credit: 0,
-      },
-    ];
-    if (proceeds > 0) {
-      lines.push({ account_code: '1-10001', account_name: accountName('1-10001'), debit: proceeds, credit: 0 });
-    }
-    if (gainLoss < 0) {
-      lines.push({ account_code: '9-10001', account_name: accountName('9-10001'), debit: -gainLoss, credit: 0 });
-    }
-    lines.push({
-      account_code: cat.akunta_asset_account,
-      account_name: accountName(cat.akunta_asset_account),
-      debit: 0,
-      credit: asset.acquisition_cost,
-    });
-    if (gainLoss > 0) {
-      lines.push({ account_code: '8-10001', account_name: accountName('8-10001'), debit: 0, credit: gainLoss });
-    }
+    const scenario =
+      input.type === 'writeoff' ? 'writeoff' : gainLoss > 0.005 ? 'sale_gain' : gainLoss < -0.005 ? 'sale_loss' : 'sale_even';
+    const memo = `${input.type === 'sale' ? 'Penjualan' : 'Penghapusan'} aset ${asset.code}`;
 
-    const now = new Date().toISOString();
-    const journal: JournalEntry = {
-      id: id('jrn'),
-      idempotency_key: `disp:${asset.id}:${input.date}`,
-      source: 'disposal',
-      source_ref: asset.code,
+    // Auto Mapping payload — only legs with a value > 0 (ingest rejects zeros).
+    const payload: Record<string, unknown> = {
+      event: 'disposal',
+      scenario,
+      asset_id: asset.id,
+      asset_code: asset.code,
+      asset_name: asset.name,
+      category_code: cat.code,
       date: input.date,
-      memo: `${input.type === 'sale' ? 'Penjualan' : 'Penghapusan'} aset ${asset.code}`,
-      status: 'queued',
-      akunta_journal_no: null,
-      lines,
-      created_at: now,
-      posted_at: null,
+      cost: asset.acquisition_cost,
+      memo,
     };
-    pushToAkunta(journal);
-    journals.push(journal);
+    if (asset.accumulated_depreciation > 0) payload.accumulated = asset.accumulated_depreciation;
+    if (proceeds > 0) payload.proceeds = proceeds;
+    if (gainLoss > 0.005) payload.gain = gainLoss;
+    else if (gainLoss < -0.005) payload.loss = -gainLoss;
+
+    const journal = emitEvent({
+      source: 'disposal',
+      source_type: 'asetto.disposal',
+      source_ref: asset.id,
+      entity_id: asset.entity_id,
+      idempotency_key: `asetto:disp:${asset.id}:${input.date}`,
+      date: input.date,
+      memo,
+      payload,
+    });
 
     asset.status = 'disposed';
     asset.condition = 'idle';
+    auditPush(asset.id, 'disposed', input.type === 'sale' ? 'Aset dijual (pelepasan).' : 'Aset dihapuskan (write-off).');
 
     const disposal: Disposal = {
       id: id('disp'),
@@ -577,7 +799,7 @@ export const db = {
   retryJournal(journalId: string): JournalEntry {
     const journal = journals.find((j) => j.id === journalId);
     if (!journal) throw new ApiMockError(404, 'Jurnal tidak ditemukan');
-    if (journal.status === 'posted') return journal;
+    if (journal.status === 'accepted') return journal;
     pushToAkunta(journal, true);
     return journal;
   },

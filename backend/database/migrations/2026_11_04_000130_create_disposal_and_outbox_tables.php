@@ -28,16 +28,21 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        // Outbox for Akunta Auto Mapping ingest. Asetto emits a business event
+        // (raw JSON payload, no account codes); the Akunta admin maps fields →
+        // accounts once per source_type. We never translate accounts here.
         Schema::create('journal_outbox', function (Blueprint $table) {
             $table->ulid('id')->primary();
             $table->string('idempotency_key')->unique();
-            $table->string('source', 32);     // depreciation | disposal
-            $table->string('source_ref');     // run id / disposal id
+            $table->string('source', 32);         // depreciation | disposal | acquisition
+            $table->string('source_type', 80);    // Akunta source_type, e.g. asetto.depreciation
+            $table->string('source_ref');         // run id / disposal id / asset id
+            $table->ulid('entity_id');            // Asetto's own entity id (sent as source_entity_id)
             $table->date('date');
             $table->text('memo');
-            $table->string('status', 16)->default('queued'); // queued | posted | failed
-            $table->string('akunta_journal_no')->nullable();
-            $table->json('lines');
+            $table->string('status', 16)->default('queued'); // queued | accepted | failed
+            $table->string('akunta_raw_id')->nullable();     // raw_id returned by ingest (202)
+            $table->json('payload');              // business JSON sent to ingest
             $table->text('last_error')->nullable();
             $table->timestamp('posted_at')->nullable();
             $table->timestamps();

@@ -17,7 +17,7 @@ export function AssetStatusBadge({ status }: { status: AssetStatus }) {
 }
 
 const journalMeta: Record<JournalStatus, { tone: 'success' | 'warning' | 'danger'; label: string }> = {
-  posted: { tone: 'success', label: 'Terkirim' },
+  accepted: { tone: 'success', label: 'Diterima' },
   queued: { tone: 'warning', label: 'Antre' },
   failed: { tone: 'danger', label: 'Gagal' },
 };

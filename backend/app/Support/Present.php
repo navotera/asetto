@@ -6,7 +6,11 @@ namespace App\Support;
 
 use App\Models\Asset;
 use App\Models\AssetCategory;
+use App\Models\AssetPhoto;
+use App\Models\AssetPurchase;
 use App\Models\Custodian;
+use App\Models\CustodyHandover;
+use App\Models\DepreciationLine;
 use App\Models\DepreciationRun;
 use App\Models\Disposal;
 use App\Models\JournalOutbox;
@@ -18,8 +22,12 @@ use App\Models\JournalOutbox;
  */
 class Present
 {
-    /** @return array<string, mixed> */
-    public static function asset(Asset $asset): array
+    /**
+     * @param  bool  $withValues  when false, monetary fields are nulled out and
+     *                            `values_hidden` is set (for users lacking asset.view_value).
+     * @return array<string, mixed>
+     */
+    public static function asset(Asset $asset, bool $withValues = true): array
     {
         $cost = (float) $asset->acquisition_cost;
         $accum = (float) $asset->accumulated_depreciation;
@@ -28,10 +36,11 @@ class Present
             'id' => $asset->id,
             'code' => $asset->code,
             'name' => $asset->name,
+            'entity_id' => $asset->entity_id,
             'category_id' => $asset->category_id,
             'acquisition_date' => self::date($asset->acquisition_date),
-            'acquisition_cost' => $cost,
-            'salvage_value' => (float) $asset->salvage_value,
+            'acquisition_cost' => $withValues ? $cost : null,
+            'salvage_value' => $withValues ? (float) $asset->salvage_value : null,
             'useful_life_months' => (int) $asset->useful_life_months,
             'method' => $asset->method,
             'condition' => $asset->condition,
@@ -40,9 +49,10 @@ class Present
             'serial_number' => $asset->serial_number,
             'notes' => $asset->notes,
             'status' => $asset->status,
-            'accumulated_depreciation' => $accum,
-            'book_value' => max(0.0, $cost - $accum),
+            'accumulated_depreciation' => $withValues ? $accum : null,
+            'book_value' => $withValues ? max(0.0, $cost - $accum) : null,
             'last_depreciated_period' => $asset->last_depreciated_period,
+            'values_hidden' => ! $withValues,
         ];
     }
 
@@ -55,22 +65,23 @@ class Present
             'name' => $c->name,
             'default_method' => $c->default_method,
             'default_useful_life_months' => (int) $c->default_useful_life_months,
-            'akunta_asset_account' => $c->akunta_asset_account,
-            'akunta_accum_dep_account' => $c->akunta_accum_dep_account,
-            'akunta_dep_expense_account' => $c->akunta_dep_expense_account,
+            'asset_count' => $c->assets_count ?? null,
         ];
     }
 
     /** @return array<string, mixed> */
     public static function custodian(Custodian $c): array
     {
-        return array_filter([
+        return [
             'id' => $c->id,
             'type' => $c->type,
             'code' => $c->code,
             'name' => $c->name,
             'department' => $c->department,
-        ], fn ($v) => $v !== null);
+            'user_id' => $c->user_id,
+            'ecopa_user_id' => $c->relationLoaded('user') ? $c->user?->main_tier_user_id : null,
+            'user_name' => $c->relationLoaded('user') ? $c->user?->name : null,
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -127,25 +138,87 @@ class Present
     /** @return array<string, mixed> */
     public static function journal(JournalOutbox $j): array
     {
-        $lines = array_map(fn (array $l) => [
-            'account_code' => $l['account_code'] ?? '',
-            'account_name' => $l['account_name'] ?? '',
-            'debit' => (float) ($l['debit'] ?? 0),
-            'credit' => (float) ($l['credit'] ?? 0),
-        ], (array) $j->lines);
-
         return [
             'id' => $j->id,
             'idempotency_key' => $j->idempotency_key,
             'source' => $j->source,
+            'source_type' => $j->source_type,
             'source_ref' => $j->source_ref,
+            'entity_id' => $j->entity_id,
             'date' => self::date($j->date),
             'memo' => $j->memo,
             'status' => $j->status,
-            'akunta_journal_no' => $j->akunta_journal_no,
-            'lines' => $lines,
+            'akunta_raw_id' => $j->akunta_raw_id,
+            'payload' => (array) $j->payload,
+            'last_error' => $j->last_error,
             'created_at' => self::iso($j->created_at),
             'posted_at' => self::iso($j->posted_at),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function custodyHandover(CustodyHandover $h): array
+    {
+        return [
+            'id' => $h->id,
+            'from_custodian_id' => $h->from_custodian_id,
+            'from_custodian_name' => $h->fromCustodian?->name,
+            'to_custodian_id' => $h->to_custodian_id,
+            'to_custodian_name' => $h->toCustodian?->name,
+            'from_location' => $h->from_location,
+            'to_location' => $h->to_location,
+            'condition_at_handover' => $h->condition_at_handover,
+            'notes' => $h->notes,
+            'handed_at' => self::iso($h->handed_at),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function assetDepreciationLine(DepreciationLine $line): array
+    {
+        return [
+            'period' => $line->run?->period,
+            'status' => $line->run?->status,
+            'amount' => (float) $line->amount,
+            'book_value_before' => (float) $line->book_value_before,
+            'book_value_after' => (float) $line->book_value_after,
+            'journal_id' => $line->run?->journal_id,
+            'posted_at' => self::iso($line->run?->posted_at),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function photo(AssetPhoto $p): array
+    {
+        return [
+            'id' => $p->id,
+            'url' => $p->url(),
+            'thumb_url' => $p->thumbUrl(),
+            'caption' => $p->caption,
+            'width' => $p->width,
+            'height' => $p->height,
+            'taken_at' => self::iso($p->taken_at),
+            'created_at' => self::iso($p->created_at),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function purchase(?AssetPurchase $p): ?array
+    {
+        if (! $p) {
+            return null;
+        }
+
+        return [
+            'id' => $p->id,
+            'vendor' => $p->vendor,
+            'invoice_no' => $p->invoice_no,
+            'purchase_date' => self::date($p->purchase_date),
+            'amount' => (float) $p->amount,
+            'notes' => $p->notes,
+            'proof_url' => $p->proofUrl(),
+            'proof_thumb_url' => $p->proofThumbUrl(),
+            'proof_type' => $p->proof_type,
         ];
     }
 

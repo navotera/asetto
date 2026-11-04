@@ -11,10 +11,15 @@ export interface AssetCategory {
   name: string;
   default_method: DepreciationMethod;
   default_useful_life_months: number;
-  /** Akun GL di Akunta yang dipakai saat posting jurnal. */
-  akunta_asset_account: string;
-  akunta_accum_dep_account: string;
-  akunta_dep_expense_account: string;
+  asset_count?: number | null;
+}
+
+/** A company (PT) that an asset — and its journals — belong to. The id is
+ *  Asetto's own; it is sent to Akunta as `source_entity_id`, which the Akunta
+ *  admin maps once to an Akunta entity (AutoMappingEntityLink). */
+export interface Entity {
+  id: string;
+  name: string;
 }
 
 export interface Custodian {
@@ -22,13 +27,17 @@ export interface Custodian {
   type: CustodianType;
   code: string;
   name: string;
-  department?: string;
+  department?: string | null;
+  user_id?: string | null;
+  ecopa_user_id?: string | null;
+  user_name?: string | null;
 }
 
 export interface Asset {
   id: string;
   code: string;
   name: string;
+  entity_id: string;
   category_id: string;
   acquisition_date: string; // ISO date
   acquisition_cost: number;
@@ -46,6 +55,8 @@ export interface Asset {
   book_value: number;
   /** Period (YYYY-MM) of the last posted depreciation for this asset. */
   last_depreciated_period: string | null;
+  /** True when monetary fields are nulled for a viewer without asset.view_value. */
+  values_hidden?: boolean;
 }
 
 export interface DepreciationLine {
@@ -87,31 +98,28 @@ export interface Disposal {
   status: RunStatus;
 }
 
-export type JournalStatus = 'queued' | 'posted' | 'failed';
-export type JournalSource = 'depreciation' | 'disposal';
-
-export interface JournalLine {
-  account_code: string;
-  account_name: string;
-  debit: number;
-  credit: number;
-}
+export type JournalStatus = 'queued' | 'accepted' | 'failed';
+export type JournalSource = 'acquisition' | 'depreciation' | 'disposal';
 
 /**
- * A journal the Asetto backend would push to Akunta server-to-server via the
- * PHP `api-client` package. In mock mode these live in an in-browser "outbox"
- * so the depreciation → jurnal flow is visible end-to-end.
+ * A business event Asetto emits to Akunta's Auto Mapping ingest endpoint
+ * server-to-server (NO account codes — the Akunta admin maps fields → accounts
+ * once per `source_type`). The outbox makes the flow visible and resilient:
+ * `queued` → `accepted` (202, Akunta returns `akunta_raw_id`) or `failed`.
  */
 export interface JournalEntry {
   id: string;
   idempotency_key: string;
   source: JournalSource;
+  source_type: string;
   source_ref: string;
+  entity_id: string;
   date: string;
   memo: string;
   status: JournalStatus;
-  akunta_journal_no: string | null;
-  lines: JournalLine[];
+  akunta_raw_id: string | null;
+  payload: Record<string, unknown>;
+  last_error?: string | null;
   created_at: string;
   posted_at: string | null;
 }
@@ -122,6 +130,136 @@ export interface Me {
   email: string;
   app_role: 'admin' | 'user';
   roles: string[];
+  role?: string | null;
+  permissions: string[];
+  is_impersonating: boolean;
+  impersonator?: { id: string; name: string } | null;
+}
+
+export interface RoleOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface ManagedUser {
+  assignment_id: string;
+  user_id: string;
+  ecopa_user_id: string | null;
+  name: string | null;
+  email: string | null;
+  ecopa_role: string | null;
+  role_id: string | null;
+  role_code: string | null;
+  role_name: string | null;
+  disabled_at: string | null;
+  can_update_role: boolean;
+  can_impersonate: boolean;
+}
+
+export interface UnassignedUser {
+  assignment_id: string;
+  user_id: string;
+  ecopa_user_id: string | null;
+  name: string | null;
+  email: string | null;
+  can_impersonate?: boolean;
+}
+
+export interface RoleManagementData {
+  users: ManagedUser[];
+  unassigned_users: UnassignedUser[];
+  roles: RoleOption[];
+}
+
+export interface PermCatalogItem {
+  code: string;
+  group: string;
+  label: string;
+}
+
+export interface MatrixRole {
+  code: string;
+  name: string;
+  is_preset: boolean;
+  editable: boolean;
+  permissions: string[];
+}
+
+export interface PermissionMatrix {
+  catalog: PermCatalogItem[];
+  roles: MatrixRole[];
+}
+
+export interface MyAsset {
+  id: string;
+  code: string;
+  name: string;
+  category_name: string | null;
+  condition: AssetCondition;
+  location: string;
+  status: AssetStatus;
+  acquisition_date: string;
+}
+
+export interface CustodyHandover {
+  id: string;
+  from_custodian_id: string | null;
+  from_custodian_name: string | null;
+  to_custodian_id: string | null;
+  to_custodian_name: string | null;
+  from_location: string | null;
+  to_location: string | null;
+  condition_at_handover: AssetCondition | null;
+  notes: string | null;
+  handed_at: string | null;
+}
+
+export interface AssetPhoto {
+  id: string;
+  url: string | null;
+  thumb_url: string | null;
+  caption: string | null;
+  width: number | null;
+  height: number | null;
+  taken_at: string | null;
+  created_at: string | null;
+}
+
+export interface AssetPurchase {
+  id: string;
+  vendor: string | null;
+  invoice_no: string | null;
+  purchase_date: string | null;
+  amount: number;
+  notes: string | null;
+  proof_url: string | null;
+  proof_thumb_url: string | null;
+  proof_type: 'image' | 'pdf' | null;
+}
+
+export interface AssetAuditEntry {
+  id: string;
+  action: string;
+  description: string | null;
+  actor_name: string | null;
+  created_at: string | null;
+}
+
+export interface AssetDepreciationEntry {
+  period: string | null;
+  status: RunStatus;
+  amount: number;
+  book_value_before: number;
+  book_value_after: number;
+  journal_id: string | null;
+  posted_at: string | null;
+}
+
+export interface AppSettings {
+  mode: 'auto_post' | 'draft';
+  disk: string;
+  disks?: string[];
 }
 
 export interface DashboardSummary {

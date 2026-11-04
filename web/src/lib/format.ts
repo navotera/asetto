@@ -23,6 +23,20 @@ export function formatDate(iso: string | null | undefined): string {
   }).format(d);
 }
 
+/** ISO datetime → "04 Nov 2026, 14:30". */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
+
 /** "2026-11" → "November 2026". */
 export function formatPeriod(period: string): string {
   const [y, m] = period.split('-').map(Number);

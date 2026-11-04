@@ -3,14 +3,33 @@ import { useDashboard } from '@/api/queries';
 import { PageHeader, StatCard, Card, CardHeader, Button, LoadingBlock } from '@/components/ui/primitives';
 import { JournalStatusBadge } from '@/components/ui/badges';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
+import { DonutChart, CHART_PALETTE } from '@/components/ui/DonutChart';
 import { formatIDR, formatPeriod } from '@/lib/format';
+
+/** Compact Rupiah for the donut centre, e.g. "Rp 1,2 M". */
+function shortIDR(value: number): string {
+  if (value >= 1_000_000_000) return `Rp ${(value / 1_000_000_000).toFixed(1).replace('.', ',')} M`;
+  if (value >= 1_000_000) return `Rp ${(value / 1_000_000).toFixed(0)} jt`;
+  return formatIDR(value);
+}
 
 export default function DashboardPage() {
   const { data, isLoading } = useDashboard();
 
   if (isLoading || !data) return <LoadingBlock />;
 
-  const maxCat = Math.max(1, ...data.book_value_by_category.map((c) => c.book_value));
+  const categorySegments = data.book_value_by_category.map((c, i) => ({
+    label: c.category,
+    value: c.book_value,
+    color: CHART_PALETTE[i % CHART_PALETTE.length],
+  }));
+
+  const conditionSegments = [
+    { label: 'Baik', value: data.condition_breakdown.good, color: 'var(--a-success)' },
+    { label: 'Perlu perbaikan', value: data.condition_breakdown.needs_repair, color: 'var(--a-warning)' },
+    { label: 'Rusak', value: data.condition_breakdown.broken, color: 'var(--a-danger)' },
+    { label: 'Tidak terpakai', value: data.condition_breakdown.idle, color: 'var(--a-text-muted)' },
+  ];
 
   return (
     <div>
@@ -53,29 +72,23 @@ export default function DashboardPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader title="Nilai buku per kategori" subtitle="Komposisi aset aktif berdasarkan nilai buku." />
-          <div className="flex flex-col gap-4 px-5 py-5">
-            {data.book_value_by_category.map((c) => (
-              <div key={c.category}>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-text-default">{c.category}</span>
-                  <span className="font-semibold text-text-strong">{formatIDR(c.book_value)}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-border-soft">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${(c.book_value / maxCat) * 100}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
+          <DonutChart
+            segments={categorySegments}
+            formatValue={formatIDR}
+            centerValue={shortIDR(data.total_book_value)}
+            centerLabel="Nilai Buku"
+            emptyLabel="Belum ada aset aktif."
+          />
         </Card>
 
         <Card>
           <CardHeader title="Kondisi aset" subtitle="Aset aktif." />
-          <div className="flex flex-col gap-3 px-5 py-5">
-            <ConditionRow label="Baik" value={data.condition_breakdown.good} tone="bg-success" />
-            <ConditionRow label="Perlu perbaikan" value={data.condition_breakdown.needs_repair} tone="bg-warning" />
-            <ConditionRow label="Rusak" value={data.condition_breakdown.broken} tone="bg-danger" />
-            <ConditionRow label="Tidak terpakai" value={data.condition_breakdown.idle} tone="bg-text-muted" />
-          </div>
+          <DonutChart
+            segments={conditionSegments}
+            centerValue={String(data.active_count)}
+            centerLabel="Aset Aktif"
+            emptyLabel="Belum ada aset aktif."
+          />
         </Card>
       </div>
 
@@ -99,19 +112,22 @@ export default function DashboardPage() {
                 <Th>Sumber</Th>
                 <Th align="right">Nilai</Th>
                 <Th align="center">Status</Th>
-                <Th>No. Jurnal Akunta</Th>
+                <Th>Raw ID Akunta</Th>
               </tr>
             </thead>
             <tbody>
               {data.recent_journals.map((j) => {
-                const total = j.lines.reduce((s, l) => s + l.debit, 0);
+                const p = (j.payload ?? {}) as Record<string, unknown>;
+                const total = typeof p.amount === 'number' ? p.amount : typeof p.cost === 'number' ? p.cost : 0;
+                const sourceLabel =
+                  j.source === 'depreciation' ? 'Depresiasi' : j.source === 'acquisition' ? 'Perolehan' : 'Pelepasan';
                 return (
                   <Tr key={j.id}>
                     <Td>{j.memo}</Td>
-                    <Td className="capitalize">{j.source === 'depreciation' ? 'Depresiasi' : 'Pelepasan'}</Td>
+                    <Td>{sourceLabel}</Td>
                     <Td align="right" className="font-mono">{formatIDR(total)}</Td>
                     <Td align="center"><JournalStatusBadge status={j.status} /></Td>
-                    <Td className="font-mono text-xs text-text-muted">{j.akunta_journal_no ?? '—'}</Td>
+                    <Td className="font-mono text-xs text-text-muted">{j.akunta_raw_id ?? '—'}</Td>
                   </Tr>
                 );
               })}

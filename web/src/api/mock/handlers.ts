@@ -28,9 +28,16 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if (m === 'GET' && path === '/me') return db.me();
   if (m === 'GET' && path === '/dashboard') return db.dashboard();
   if (m === 'GET' && path === '/categories') return db.categories();
+  if (m === 'POST' && path === '/categories') return db.createCategory(body);
+  if ((p = match(path, '/categories/:id'))) {
+    if (m === 'PATCH') return db.updateCategory(p.id, body);
+    if (m === 'DELETE') return db.deleteCategory(p.id);
+  }
   if (m === 'GET' && path === '/custodians') return db.custodians();
+  if (m === 'GET' && path === '/entities') return db.entities();
 
   if (m === 'GET' && path === '/assets') return db.listAssets();
+  if (m === 'GET' && path === '/assets/mine') return db.myAssets();
   if (m === 'POST' && path === '/assets') return db.createAsset(body);
   if ((p = match(path, '/assets/:id'))) {
     if (m === 'GET') return db.getAsset(p.id) ?? notFound('Aset');
@@ -40,7 +47,22 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if ((p = match(path, '/assets/:id/condition')) && m === 'POST')
     return db.setCondition(p.id, body.condition);
   if ((p = match(path, '/assets/:id/reassign')) && m === 'POST')
-    return db.reassign(p.id, body.custodian_id ?? null, body.location);
+    return db.reassign(p.id, body);
+  if ((p = match(path, '/assets/:id/custody-history')) && m === 'GET')
+    return db.custodyHistory(p.id);
+  if ((p = match(path, '/assets/:id/depreciation')) && m === 'GET')
+    return db.assetDepreciation(p.id);
+  if ((p = match(path, '/assets/:id/audit')) && m === 'GET')
+    return db.assetAudit(p.id);
+  if ((p = match(path, '/assets/:id/photos'))) {
+    if (m === 'GET') return db.listPhotos(p.id);
+    if (m === 'POST') return db.addPhoto(p.id, body);
+  }
+  if ((p = match(path, '/photos/:id')) && m === 'DELETE') return db.deletePhoto(p.id);
+  if ((p = match(path, '/assets/:id/purchase'))) {
+    if (m === 'GET') return db.getPurchase(p.id);
+    if (m === 'POST') return db.savePurchase(p.id, body);
+  }
 
   if (m === 'GET' && path === '/depreciation/pending') return { period: db.pendingPeriod() };
   if (m === 'GET' && path === '/depreciation/preview')
@@ -56,6 +78,22 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if (m === 'GET' && path === '/journals') return db.listJournals();
   if ((p = match(path, '/journals/:id')) && m === 'GET') return db.getJournal(p.id) ?? notFound('Jurnal');
   if ((p = match(path, '/journals/:id/retry')) && m === 'POST') return db.retryJournal(p.id);
+
+  if ((p = match(path, '/depreciation/runs/:id/commit')) && m === 'POST')
+    return db.getRun(p.id) ?? notFound('Run');
+
+  if (m === 'GET' && path === '/settings') return db.getSettings();
+  if (m === 'PUT' && path === '/settings') return db.saveSettings(body);
+
+  // RBAC
+  if (m === 'GET' && path === '/role-management') return db.roleManagement();
+  if (m === 'POST' && path === '/role-management/assign') return db.assignRole();
+  if (m === 'POST' && path === '/role-management/stop-impersonation') return db.stopImpersonation();
+  if ((p = match(path, '/role-management/:id/impersonate')) && m === 'POST') return db.impersonate();
+  if ((p = match(path, '/role-management/:id')) && m === 'PATCH') return db.updateAssignment();
+  if (m === 'GET' && path === '/permission-matrix') return db.permissionMatrix();
+  if ((p = match(path, '/permission-matrix/:roleCode')) && m === 'PUT') return db.saveRoleMatrix(p.roleCode, body.permissions ?? []);
+  if ((p = match(path, '/custodians/:id')) && m === 'PATCH') return db.linkCustodian(p.id, body.user_id ?? null);
 
   throw new ApiMockError(404, `Mock route tidak ada: ${m} ${path}`);
 }

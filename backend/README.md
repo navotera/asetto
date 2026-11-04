@@ -52,15 +52,32 @@ composer install
 cp .env.example .env   # already present after create-project
 php artisan key:generate
 php artisan migrate --seed   # SQLite by default (database/database.sqlite)
-php artisan serve            # http://localhost:8000
+php artisan serve            # http://localhost:8090
 ```
 
 Point the SPA at this backend by setting its env (`../web/.env`):
 
 ```
 VITE_API_MODE=live
-VITE_API_BASE=http://localhost:8000
+VITE_API_BASE=http://localhost:8090
 ```
+
+Or just run both from the repo root: `.\serve.ps1 -Live` (backend :8090 + SPA
+:5180, Ecopa bypass on).
+
+### Local dev — Ecopa bypass (on/off)
+
+To develop/review without a running Ecopa, set in `.env`:
+
+```
+ASETTO_DEV_LOGIN=true          # LOCAL ONLY — hard-disabled in production
+ASETTO_SPA_URL=http://localhost:5180
+```
+
+The login routes then log in a dev admin shadow user (no password) instead of
+redirecting to Ecopa, so the SPA works end-to-end. Turn it **off** (`false`) and
+fill the `ECOPA_*` values to switch to real SSO — no code change. See AGENTS.md
+§8.2; this is a dev shim, not a new password login.
 
 ## Auth & integration flow
 

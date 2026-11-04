@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Disposal;
 use App\Services\AkuntaPostingService;
+use App\Support\AssetAudit;
 use App\Support\Present;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,7 +64,8 @@ class DisposalController extends Controller
         });
 
         $journal = $this->posting->postDisposal($disposal, $asset);
-        $disposal->forceFill(['journal_id' => $journal->id])->save();
+        $disposal->forceFill(['journal_id' => $journal?->id])->save();
+        AssetAudit::log($asset->id, 'disposed', $data['type'] === 'sale' ? 'Aset dijual (pelepasan).' : 'Aset dihapuskan (write-off).');
 
         return response()->json(Present::disposal($disposal->refresh()), 201);
     }

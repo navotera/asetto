@@ -1,9 +1,14 @@
-import { useMe } from '@/api/queries';
+import { useMemo, useState, type ReactNode } from 'react';
+import { useMe, useSettings, useSaveSettings, useCan } from '@/api/queries';
 import { api } from '@/api/client';
-import { PageHeader, Card, CardHeader, Badge, Button } from '@/components/ui/primitives';
-import { useColorMode, setColorMode } from '@/hooks/useColorMode';
+import { PageHeader, Card, CardHeader, Badge, Field, Select, Spinner } from '@/components/ui/primitives';
+import { cn } from '@/lib/cn';
+import { useToast } from '@/components/ui/toast';
+import { UserRolesPanel } from './settings/UserRolesPanel';
+import { RoleMatrixPanel } from './settings/RoleMatrixPanel';
+import { CustodianLinkPanel } from './settings/CustodianLinkPanel';
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between border-b border-border-soft px-5 py-3 last:border-0">
       <span className="text-sm text-text-muted">{label}</span>
@@ -12,60 +17,153 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+interface Section {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  adminOnly?: boolean;
+}
+
+const SECTIONS: Section[] = [
+  { id: 'profil', label: 'Profil Pengguna', description: 'Identitas dari Ecopa', icon: '◉' },
+  { id: 'depresiasi', label: 'Depresiasi Terjadwal', description: 'Mode posting otomatis', icon: '↘', adminOnly: true },
+  { id: 'penyimpanan', label: 'Penyimpanan File', description: 'Disk foto & bukti', icon: '▤', adminOnly: true },
+  { id: 'users', label: 'User & Roles', description: 'Assign role & impersonate', icon: '♙', adminOnly: true },
+  { id: 'roles', label: 'Role Management', description: 'Matriks izin role', icon: '✓', adminOnly: true },
+  { id: 'custodian', label: 'Tautan Custodian', description: 'Custodian → user Ecopa', icon: '⇄', adminOnly: true },
+  { id: 'integrasi', label: 'Integrasi', description: 'Ecopa & Akunta', icon: '⇆' },
+];
+
 export default function SettingsPage() {
   const { data: me } = useMe();
-  const mode = useColorMode();
+  const { data: settings } = useSettings();
+  const save = useSaveSettings();
+  const toast = useToast();
+  const { can } = useCan();
+  const isAdmin = me?.app_role === 'admin' || can('settings.manage');
+
+  const sections = useMemo(() => SECTIONS.filter((s) => !s.adminOnly || isAdmin), [isAdmin]);
+  const [active, setActive] = useState('profil');
+  const current = sections.find((s) => s.id === active) ?? sections[0];
+
+  async function update(patch: { mode?: 'auto_post' | 'draft'; disk?: string }) {
+    try {
+      await save.mutateAsync(patch);
+      toast('success', 'Pengaturan disimpan.');
+    } catch {
+      toast('error', 'Gagal menyimpan pengaturan.');
+    }
+  }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="lg:col-span-2">
-        <PageHeader title="Pengaturan" description="Profil, tampilan, dan status integrasi ekosistem." />
-      </div>
+    <div>
+      <PageHeader title="Pengaturan" description="Profil, operasional, akses, dan integrasi ekosistem." />
 
-      <Card>
-        <CardHeader title="Profil Pengguna" subtitle="Identitas berasal dari Ecopa (SSO)." />
-        <Row label="Nama" value={me?.name ?? '—'} />
-        <Row label="Email" value={me?.email ?? '—'} />
-        <Row label="Peran Ekosistem" value={<Badge tone="info">{me?.app_role ?? '—'}</Badge>} />
-        <Row label="Peran Asetto" value={me?.roles?.join(', ') ?? '—'} />
-      </Card>
-
-      <Card>
-        <CardHeader title="Tampilan" subtitle="Preferensi tema disimpan di perangkat ini." />
-        <div className="flex items-center gap-2 px-5 py-4">
-          <Button variant={mode === 'light' ? 'primary' : 'secondary'} onClick={() => setColorMode('light')}>☀ Terang</Button>
-          <Button variant={mode === 'dark' ? 'primary' : 'secondary'} onClick={() => setColorMode('dark')}>☾ Gelap</Button>
-        </div>
-      </Card>
-
-      <Card className="lg:col-span-2">
-        <CardHeader
-          title="Integrasi"
-          subtitle="Identitas lewat Ecopa; data akuntansi dikirim ke Akunta."
-        />
-        <Row
-          label="Mode API"
-          value={
-            api.mode === 'mock'
-              ? <Badge tone="warning">Mock (data contoh di browser)</Badge>
-              : <Badge tone="success">Live (backend Asetto)</Badge>
-          }
-        />
-        <Row label="Identity Provider" value="Ecopa — OIDC (silent SSO)" />
-        <Row label="General Ledger" value="Akunta — REST api-client (server-to-server)" />
-        <Row label="Posting jurnal" value="Idempoten, mengikuti periode & invariant Akunta" />
-      </Card>
-
-      {api.mode === 'mock' && (
-        <Card className="lg:col-span-2 border-warning/40">
-          <div className="px-5 py-4 text-sm text-text-muted">
-            <strong className="text-text-default">Catatan mode mock.</strong> Seluruh data berjalan di browser dengan
-            dataset contoh. Alur depresiasi → jurnal ke Akunta disimulasikan di outbox lokal. Untuk menghubungkan ke
-            backend Asetto sungguhan, set <code className="font-mono">VITE_API_MODE=live</code> dan{' '}
-            <code className="font-mono">VITE_API_BASE</code> di <code className="font-mono">.env</code>.
-          </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+        {/* Left vertical menu */}
+        <Card className="h-fit p-2">
+          <nav className="flex flex-col gap-0.5">
+            {sections.map((s) => {
+              const isActive = current?.id === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setActive(s.id)}
+                  className={cn(
+                    'flex items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+                    isActive ? 'bg-primary-light' : 'hover:bg-primary-light/60',
+                  )}
+                >
+                  <span className={cn('mt-0.5 w-4 text-center text-base', isActive ? 'text-primary' : 'text-text-muted')}>
+                    {s.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span className={cn('block text-sm font-semibold', isActive ? 'text-primary' : 'text-text-default')}>
+                      {s.label}
+                    </span>
+                    <span className="block text-[11px] text-text-muted">{s.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
         </Card>
-      )}
+
+        {/* Right detail panel */}
+        <div className="min-w-0">
+          {current?.id === 'profil' && (
+            <Card>
+              <CardHeader title="Profil Pengguna" subtitle="Identitas berasal dari Ecopa (SSO)." />
+              <Row label="Nama" value={me?.name ?? '—'} />
+              <Row label="Email" value={me?.email ?? '—'} />
+              <Row label="Peran Ekosistem" value={<Badge tone="info">{me?.app_role ?? '—'}</Badge>} />
+              <Row label="Peran Asetto" value={me?.role ?? (me?.roles?.length ? me.roles.join(', ') : '—')} />
+            </Card>
+          )}
+
+          {current?.id === 'depresiasi' && (
+            <Card>
+              <CardHeader title="Depresiasi Terjadwal" subtitle="Cara menjalankan depresiasi bulanan otomatis." />
+              <div className="px-5 py-4">
+                <Field label="Mode" hint="Auto-post langsung kirim jurnal ke Akunta; draft perlu disetujui admin.">
+                  <Select
+                    value={settings?.mode ?? 'auto_post'}
+                    disabled={save.isPending || !settings}
+                    onChange={(e) => update({ mode: e.target.value as 'auto_post' | 'draft' })}
+                  >
+                    <option value="auto_post">Auto-post (otomatis ke Akunta)</option>
+                    <option value="draft">Draft (perlu persetujuan admin)</option>
+                  </Select>
+                </Field>
+              </div>
+            </Card>
+          )}
+
+          {current?.id === 'penyimpanan' && (
+            <Card>
+              <CardHeader title="Penyimpanan File" subtitle="Lokasi penyimpanan foto aset & bukti pembelian." />
+              <div className="px-5 py-4">
+                <Field label="Disk" hint="Foto/bukti otomatis di-resize + dibuat thumbnail; original tidak disimpan.">
+                  <Select
+                    value={settings?.disk ?? 'public'}
+                    disabled={save.isPending || !settings}
+                    onChange={(e) => update({ disk: e.target.value })}
+                  >
+                    {(settings?.disks ?? ['public']).map((d) => (
+                      <option key={d} value={d}>
+                        {d === 'public' ? 'Lokal (server)' : d === 's3' ? 'Cloud (S3)' : d}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                {save.isPending && <div className="mt-2 flex items-center gap-2 text-xs text-text-muted"><Spinner /> Menyimpan…</div>}
+              </div>
+            </Card>
+          )}
+
+          {current?.id === 'users' && <UserRolesPanel />}
+          {current?.id === 'roles' && <RoleMatrixPanel />}
+          {current?.id === 'custodian' && <CustodianLinkPanel />}
+
+          {current?.id === 'integrasi' && (
+            <Card>
+              <CardHeader title="Integrasi" subtitle="Identitas lewat Ecopa; data akuntansi dikirim ke Akunta." />
+              <Row
+                label="Mode API"
+                value={
+                  api.mode === 'mock'
+                    ? <Badge tone="warning">Mock (data contoh di browser)</Badge>
+                    : <Badge tone="success">Live (backend Asetto)</Badge>
+                }
+              />
+              <Row label="Identity Provider" value="Ecopa — OIDC (silent SSO)" />
+              <Row label="General Ledger" value="Akunta — REST api-client (server-to-server)" />
+              <Row label="Posting jurnal" value="Idempoten, mengikuti periode & invariant Akunta" />
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -77,12 +77,58 @@ async function liveRequest<T>(method: string, path: string, body?: unknown): Pro
   return (payload && 'data' in payload ? payload.data : payload) as T;
 }
 
+async function liveUpload<T>(path: string, form: FormData): Promise<T> {
+  await fetch(`${API_BASE}/sanctum/csrf-cookie`, { credentials: 'include' });
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  const xsrf = getCookie('XSRF-TOKEN');
+  if (xsrf) headers['X-XSRF-TOKEN'] = xsrf;
+
+  const res = await fetch(`${API_BASE}/api${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers, // NB: no Content-Type — the browser sets the multipart boundary.
+    body: form,
+  });
+  if (res.status === 401) {
+    window.location.href = `${API_BASE}/auth/ecopa/redirect`;
+    throw new ApiError(401, 'Sesi berakhir — mengarahkan ke login Ecopa.');
+  }
+  const text = await res.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (!res.ok) {
+    const message = (payload && (payload.message as string)) || `API error ${res.status}`;
+    throw new ApiError(res.status, message, payload);
+  }
+  return (payload && 'data' in payload ? payload.data : payload) as T;
+}
+
+/** Mock upload: turn FormData into a plain object, files → ephemeral object URLs. */
+async function mockUpload<T>(path: string, form: FormData): Promise<T> {
+  await delay(160 + Math.random() * 180);
+  const body: Record<string, unknown> = {};
+  form.forEach((value, key) => {
+    body[key] =
+      value instanceof File
+        ? { __file: true, name: value.name, mime: value.type, url: URL.createObjectURL(value) }
+        : value;
+  });
+  try {
+    return handle('POST', path, body) as T;
+  } catch (err) {
+    if (err instanceof ApiMockError) throw new ApiError(err.status, err.message);
+    throw err;
+  }
+}
+
 const request = MODE === 'live' ? liveRequest : mockRequest;
+const upload = MODE === 'live' ? liveUpload : mockUpload;
 
 export const api = {
   mode: MODE,
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string) => request<T>('DELETE', path),
+  upload: <T>(path: string, form: FormData) => upload<T>(path, form),
 };

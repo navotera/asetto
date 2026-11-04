@@ -30,7 +30,7 @@ class JournalController extends Controller
 
     public function retry(JournalOutbox $journal): JsonResponse
     {
-        if ($journal->status !== 'posted') {
+        if ($journal->status !== 'accepted') {
             $this->posting->push($journal);
         }
 

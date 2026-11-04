@@ -46,6 +46,7 @@ it('lists seeded assets sorted by code with a derived book value', function () {
 it('creates an asset and auto-generates a code', function () {
     $this->postJson('/api/assets', [
         'name' => 'Printer Epson',
+        'entity_id' => \Akunta\Rbac\Models\Entity::query()->value('id'),
         'category_id' => 'cat_komputer',
         'acquisition_date' => '2026-01-10',
         'acquisition_cost' => 5_000_000,

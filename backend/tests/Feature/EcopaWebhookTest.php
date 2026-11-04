@@ -75,6 +75,29 @@ it('is idempotent — a replayed event_id is not processed twice', function () {
     expect(EcopaWebhookReceipt::query()->where('event_id', 'evt-dup-1')->count())->toBe(1);
 });
 
+it('mirrors an Ecopa entity so journals can reference the shared id', function () {
+    $id = (string) \Illuminate\Support\Str::ulid();
+
+    signedWebhook([
+        'event' => 'entity.created',
+        'event_id' => 'evt-ent-1',
+        'subject' => ['id' => $id, 'name' => 'PT Maju Jaya', 'npwp' => '01.234.567.8-901.000'],
+    ])->assertOk()->assertJsonPath('status', 'applied');
+
+    $entity = \Akunta\Rbac\Models\Entity::query()->whereKey($id)->first();
+    expect($entity)->not->toBeNull()
+        ->and($entity->name)->toBe('PT Maju Jaya');
+
+    // Asetto exposes active entities for the asset form.
+    $user = User::query()->create([
+        'id' => (string) \Illuminate\Support\Str::ulid(),
+        'email' => 'adm@example.com', 'name' => 'Adm', 'main_tier_user_id' => 'ec-adm', 'email_verified_at' => now(),
+    ]);
+    $this->withSession(['ecopa.app_role' => 'admin'])->actingAs($user)
+        ->getJson('/api/entities')->assertOk()
+        ->assertJsonFragment(['id' => $id, 'name' => 'PT Maju Jaya']);
+});
+
 it('revokes assignments on user.revoked but keeps the user row', function () {
     signedWebhook([
         'event' => 'user.assigned',

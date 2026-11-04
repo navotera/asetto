@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button, Field, Input, Select, Textarea, Spinner } from '@/components/ui/primitives';
-import { useCategories, useCustodians, useSaveAsset } from '@/api/queries';
+import { useCategories, useCustodians, useEntities, useSaveAsset } from '@/api/queries';
 import { useToast } from '@/components/ui/toast';
 import type { Asset, DepreciationMethod } from '@/api/types';
 
@@ -13,6 +13,7 @@ const methodLabels: Record<DepreciationMethod, string> = {
 
 type FormState = {
   name: string;
+  entity_id: string;
   category_id: string;
   acquisition_date: string;
   acquisition_cost: string;
@@ -28,6 +29,7 @@ type FormState = {
 function toForm(asset?: Asset | null): FormState {
   return {
     name: asset?.name ?? '',
+    entity_id: asset?.entity_id ?? '',
     category_id: asset?.category_id ?? '',
     acquisition_date: asset?.acquisition_date ?? new Date().toISOString().slice(0, 10),
     acquisition_cost: asset ? String(asset.acquisition_cost) : '',
@@ -44,6 +46,7 @@ function toForm(asset?: Asset | null): FormState {
 export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClose: () => void; asset?: Asset | null }) {
   const { data: categories } = useCategories();
   const { data: custodians } = useCustodians();
+  const { data: entities } = useEntities();
   const save = useSaveAsset();
   const toast = useToast();
   const [form, setForm] = useState<FormState>(toForm(asset));
@@ -70,14 +73,15 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   async function submit() {
-    if (!form.name || !form.category_id) {
-      toast('error', 'Nama dan kategori wajib diisi.');
+    if (!form.name || !form.category_id || !form.entity_id) {
+      toast('error', 'Nama, entitas, dan kategori wajib diisi.');
       return;
     }
     try {
       await save.mutateAsync({
         id: asset?.id,
         name: form.name,
+        entity_id: form.entity_id,
         category_id: form.category_id,
         acquisition_date: form.acquisition_date,
         acquisition_cost: Number(form.acquisition_cost) || 0,
@@ -118,6 +122,14 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
             <Input value={form.name} onChange={set('name')} placeholder="mis. Laptop Dell Latitude" />
           </Field>
         </div>
+        <Field label="Entitas (Perusahaan)" hint="Jurnal di Akunta mengacu pada entitas ini.">
+          <Select value={form.entity_id} onChange={set('entity_id')}>
+            <option value="">— pilih entitas —</option>
+            {entities?.map((e) => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Kategori">
           <Select value={form.category_id} onChange={set('category_id')}>
             <option value="">— pilih kategori —</option>

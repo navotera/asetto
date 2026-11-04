@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/cn';
+import { useCan } from '@/api/queries';
 import { navGroups, type NavItem } from './nav';
 
 function isActive(item: NavItem, pathname: string): boolean {
@@ -10,11 +11,16 @@ function isActive(item: NavItem, pathname: string): boolean {
 
 export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
   const { pathname } = useLocation();
+  const { can } = useCan();
+
+  const groups = navGroups
+    .map((group) => ({ ...group, items: group.items.filter((i) => !i.perm || can(i.perm)) }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border-soft transition-transform lg:static lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border-soft transition-transform',
         open ? 'translate-x-0' : '-translate-x-full',
       )}
       style={{ background: 'var(--a-sidebar-gradient)' }}
@@ -30,7 +36,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 pb-6">
-        {navGroups.map((group) => (
+        {groups.map((group) => (
           <div key={group.title} className="mb-4">
             <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted/80">
               {group.title}

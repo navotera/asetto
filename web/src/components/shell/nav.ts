@@ -4,6 +4,8 @@ export interface NavItem {
   icon: string;
   /** Extra path prefixes that should also light this item up. */
   match?: string[];
+  /** Permission required to see this item (omitted = always visible). */
+  perm?: string;
 }
 export interface NavGroup {
   title: string;
@@ -13,37 +15,40 @@ export interface NavGroup {
 export const navGroups: NavGroup[] = [
   {
     title: 'Ringkasan',
-    items: [{ href: '/', label: 'Dashboard', icon: '▦' }],
+    items: [
+      { href: '/', label: 'Dashboard', icon: '▦', perm: 'asset.read' },
+      { href: '/aset-saya', label: 'Aset Saya', icon: '◱', perm: 'asset.read_own' },
+    ],
   },
   {
     title: 'Aset',
     items: [
-      { href: '/aset', label: 'Daftar Aset', icon: '▣', match: ['/aset'] },
-      { href: '/kategori', label: 'Kategori Aset', icon: '⊞' },
+      { href: '/aset', label: 'Daftar Aset', icon: '▣', match: ['/aset'], perm: 'asset.read' },
+      { href: '/kategori', label: 'Kategori Aset', icon: '⊞', perm: 'asset.read' },
     ],
   },
   {
     title: 'Depresiasi',
     items: [
-      { href: '/depresiasi', label: 'Jalankan Depresiasi', icon: '↘' },
-      { href: '/depresiasi/riwayat', label: 'Riwayat Run', icon: '↻' },
+      { href: '/depresiasi', label: 'Jalankan Depresiasi', icon: '↘', perm: 'depreciation.run' },
+      { href: '/depresiasi/riwayat', label: 'Riwayat Run', icon: '↻', perm: 'asset.read' },
     ],
   },
   {
     title: 'Operasional',
     items: [
-      { href: '/kondisi', label: 'Kondisi Aset', icon: '◍' },
-      { href: '/pelimpahan', label: 'Pelimpahan', icon: '⇄' },
-      { href: '/pelepasan', label: 'Pelepasan & Penjualan', icon: '⊗' },
+      { href: '/kondisi', label: 'Kondisi Aset', icon: '◍', perm: 'asset.manage' },
+      { href: '/pelimpahan', label: 'Pelimpahan', icon: '⇄', perm: 'asset.manage' },
+      { href: '/pelepasan', label: 'Pelepasan & Penjualan', icon: '⊗', perm: 'disposal.manage' },
     ],
   },
   {
     title: 'Integrasi',
-    items: [{ href: '/akunta', label: 'Outbox Jurnal Akunta', icon: '⤤' }],
+    items: [{ href: '/akunta', label: 'Outbox Jurnal Akunta', icon: '⤤', perm: 'journal.read' }],
   },
   {
     title: 'Laporan',
-    items: [{ href: '/laporan/nilai-buku', label: 'Nilai Buku Aset', icon: '∑' }],
+    items: [{ href: '/laporan/nilai-buku', label: 'Nilai Buku Aset', icon: '∑', perm: 'asset.read' }],
   },
   {
     title: 'Lainnya',

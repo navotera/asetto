@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Webhooks;
 
 use Akunta\Rbac\Models\App as RbacApp;
+use Akunta\Rbac\Models\Entity;
+use Akunta\Rbac\Models\Tenant;
 use App\Exceptions\EcopaRegistrationException;
 use App\Http\Controllers\Controller;
 use App\Models\EcopaWebhookReceipt;
@@ -71,6 +73,7 @@ class EcopaWebhookController extends Controller
                     $event === 'user.deleted' => $this->onUserDisabled($subject),
                     $event === 'user.disabled' => $this->onUserDisabled($subject),
                     $event === 'user.enabled' => $this->onUserEnabled($subject),
+                    str_starts_with($event, 'entity.') => $this->onEntity($event, $subject),
                     default => $this->rejected('unknown_event', "Event Ecopa [{$event}] tidak didukung."),
                 };
             } catch (EcopaRegistrationException $exception) {
@@ -221,6 +224,38 @@ class EcopaWebhookController extends Controller
         }
 
         return ['status' => 'applied', 'code' => 'user_enabled'];
+    }
+
+    /**
+     * Keep Asetto's own entity list in sync with Ecopa (names/ids for the asset
+     * form). These ids are Asetto's own; Akunta maps each to an Akunta entity via
+     * AutoMappingEntityLink — there is no shared-id requirement across apps.
+     */
+    private function onEntity(string $event, array $subject): array
+    {
+        $id = (string) ($subject['id'] ?? '');
+        if ($id === '') {
+            return $this->rejected('missing_entity_id', 'Event entity membutuhkan id.');
+        }
+
+        if ($event === 'entity.deleted') {
+            Entity::query()->whereKey($id)->update(['is_active' => false]);
+
+            return ['status' => 'applied', 'code' => 'entity_deactivated'];
+        }
+
+        $tenant = Tenant::query()->first() ?? Tenant::query()->create(['name' => 'Default', 'slug' => 'default']);
+        Entity::query()->updateOrCreate(
+            ['id' => $id],
+            array_filter([
+                'tenant_id' => $tenant->id,
+                'name' => $subject['name'] ?? null,
+                'npwp' => $subject['npwp'] ?? null,
+                'address' => is_array($subject['address'] ?? null) ? $subject['address'] : null,
+            ], fn (mixed $value): bool => $value !== null),
+        );
+
+        return ['status' => 'applied', 'code' => 'entity_mirrored'];
     }
 
     private function selfApp(): RbacApp

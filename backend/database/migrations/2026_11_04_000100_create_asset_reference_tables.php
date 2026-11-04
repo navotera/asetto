@@ -5,9 +5,10 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Reference data for the asset sub-ledger: categories (carrying the Akunta GL
- * accounts used when posting journals) and custodians (office entities or
- * personnel that responsibility for an asset can be delegated to).
+ * Reference data for the asset sub-ledger: categories (the `code` is the single
+ * key the Akunta admin maps to GL accounts via Auto Mapping — Asetto itself
+ * holds no account codes) and custodians (office entities or personnel that
+ * responsibility for an asset can be delegated to).
  */
 return new class extends Migration
 {
@@ -19,10 +20,6 @@ return new class extends Migration
             $table->string('name');
             $table->string('default_method', 32)->default('straight_line');
             $table->unsignedInteger('default_useful_life_months')->default(60);
-            // GL accounts in Akunta used when this category's events are posted.
-            $table->string('akunta_asset_account');
-            $table->string('akunta_accum_dep_account');
-            $table->string('akunta_dep_expense_account');
             $table->timestamps();
         });
 

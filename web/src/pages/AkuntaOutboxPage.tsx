@@ -5,7 +5,27 @@ import { JournalStatusBadge } from '@/components/ui/badges';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { formatIDR, formatDate } from '@/lib/format';
 import { useToast } from '@/components/ui/toast';
-import type { JournalEntry } from '@/api/types';
+import type { JournalEntry, JournalSource } from '@/api/types';
+
+const sourceMeta: Record<JournalSource, { tone: 'primary' | 'info' | 'success'; label: string }> = {
+  acquisition: { tone: 'success', label: 'Perolehan' },
+  depreciation: { tone: 'primary', label: 'Depresiasi' },
+  disposal: { tone: 'info', label: 'Pelepasan' },
+};
+
+/** Monetary magnitude of an event, read from the raw business payload. */
+function eventAmount(j: JournalEntry): number {
+  const p = j.payload ?? {};
+  const first = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = p[k];
+      if (typeof v === 'number') return v;
+    }
+    return 0;
+  };
+  // acquisition/depreciation carry `amount`; disposal carries `cost`.
+  return first('amount', 'cost');
+}
 
 export default function AkuntaOutboxPage() {
   const { data: journals, isLoading } = useJournals();
@@ -13,14 +33,17 @@ export default function AkuntaOutboxPage() {
   const toast = useToast();
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const posted = (journals ?? []).filter((j) => j.status === 'posted').length;
+  const accepted = (journals ?? []).filter((j) => j.status === 'accepted').length;
   const queued = (journals ?? []).filter((j) => j.status === 'queued').length;
   const failed = (journals ?? []).filter((j) => j.status === 'failed').length;
 
   async function doRetry(id: string) {
     try {
       const res = await retry.mutateAsync(id);
-      toast(res.status === 'posted' ? 'success' : 'error', res.status === 'posted' ? 'Jurnal berhasil dikirim ulang.' : 'Masih gagal.');
+      toast(
+        res.status === 'accepted' ? 'success' : 'error',
+        res.status === 'accepted' ? 'Event berhasil dikirim ulang ke Akunta.' : 'Masih gagal.',
+      );
     } catch {
       toast('error', 'Gagal mengirim ulang.');
     }
@@ -30,23 +53,23 @@ export default function AkuntaOutboxPage() {
     <div>
       <PageHeader
         title="Outbox Jurnal Akunta"
-        description="Jurnal yang Asetto kirim ke Akunta sebagai general ledger (server-to-server via api-client)."
+        description="Peristiwa ekonomis aset yang Asetto kirim ke Auto Mapping Akunta (tanpa kode akun — admin Akunta yang memetakan field ke akun)."
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Terkirim" value={posted} tone="success" icon="✓" />
+        <StatCard label="Diterima" value={accepted} tone="success" icon="✓" />
         <StatCard label="Antre" value={queued} tone="warning" icon="…" />
         <StatCard label="Gagal" value={failed} tone="danger" icon="!" />
       </div>
 
       <Card>
-        <CardHeader title="Daftar jurnal" subtitle="Klik baris untuk melihat ayat debit/kredit." />
+        <CardHeader title="Daftar event" subtitle="Klik baris untuk melihat payload bisnis yang dikirim." />
         {isLoading ? (
           <LoadingBlock />
         ) : !journals || journals.length === 0 ? (
           <EmptyState
             title="Outbox kosong"
-            description="Jurnal akan muncul setelah Anda memposting depresiasi atau mencatat pelepasan aset."
+            description="Event akan muncul setelah Anda mencatat pembelian, memposting depresiasi, atau mencatat pelepasan aset."
             icon="⤤"
           />
         ) : (
@@ -94,7 +117,8 @@ function JournalRow({
   onRetry: () => void;
   retrying: boolean;
 }) {
-  const total = journal.lines.reduce((s, l) => s + l.debit, 0);
+  const meta = sourceMeta[journal.source];
+  const entries = Object.entries(journal.payload ?? {});
   return (
     <>
       <Tr className="cursor-pointer">
@@ -103,17 +127,16 @@ function JournalRow({
             <span className="mr-1 inline-block text-text-muted">{expanded ? '▾' : '▸'}</span>
             {journal.memo}
           </button>
-          {journal.akunta_journal_no && (
-            <div className="pl-4 font-mono text-xs text-text-muted">{journal.akunta_journal_no}</div>
+          <div className="pl-4 font-mono text-xs text-text-muted">{journal.source_type}</div>
+          {journal.akunta_raw_id && (
+            <div className="pl-4 font-mono text-xs text-text-muted">raw: {journal.akunta_raw_id}</div>
           )}
         </Td>
         <Td align="center">
-          <Badge tone={journal.source === 'depreciation' ? 'primary' : 'info'}>
-            {journal.source === 'depreciation' ? 'Depresiasi' : 'Pelepasan'}
-          </Badge>
+          <Badge tone={meta.tone}>{meta.label}</Badge>
         </Td>
         <Td>{formatDate(journal.date)}</Td>
-        <Td align="right" className="font-mono">{formatIDR(total)}</Td>
+        <Td align="right" className="font-mono">{formatIDR(eventAmount(journal))}</Td>
         <Td className="font-mono text-xs text-text-muted">{journal.idempotency_key}</Td>
         <Td align="center"><JournalStatusBadge status={journal.status} /></Td>
         <Td align="right">
@@ -129,26 +152,31 @@ function JournalRow({
       {expanded && (
         <tr>
           <td colSpan={7} className="border-b border-border-soft bg-page-bg/60 px-6 py-4">
+            {journal.last_error && (
+              <p className="mb-3 text-sm text-danger">Kesalahan terakhir: {journal.last_error}</p>
+            )}
             <table className="w-full max-w-2xl text-sm">
               <thead>
                 <tr className="text-xs uppercase text-text-muted">
-                  <th className="py-1 text-left font-semibold">Akun</th>
-                  <th className="py-1 text-right font-semibold">Debit</th>
-                  <th className="py-1 text-right font-semibold">Kredit</th>
+                  <th className="py-1 text-left font-semibold">Field</th>
+                  <th className="py-1 text-left font-semibold">Nilai</th>
                 </tr>
               </thead>
               <tbody>
-                {journal.lines.map((l, i) => (
-                  <tr key={i}>
-                    <td className="py-1">
-                      <span className="font-mono text-xs text-text-muted">{l.account_code}</span> {l.account_name}
+                {entries.map(([k, v]) => (
+                  <tr key={k}>
+                    <td className="py-1 pr-6 font-mono text-xs text-text-muted">{k}</td>
+                    <td className="py-1 font-mono">
+                      {typeof v === 'number' ? formatIDR(v) : String(v)}
                     </td>
-                    <td className="py-1 text-right font-mono">{l.debit ? formatIDR(l.debit) : ''}</td>
-                    <td className="py-1 text-right font-mono">{l.credit ? formatIDR(l.credit) : ''}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className="mt-3 max-w-2xl text-xs text-text-muted">
+              Asetto tidak mengirim kode akun. Admin Akunta memetakan field di atas ke akun GL sekali per tipe sumber
+              (<span className="font-mono">{journal.source_type}</span>) melalui fitur Auto Mapping.
+            </p>
           </td>
         </tr>
       )}

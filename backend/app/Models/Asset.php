@@ -7,6 +7,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * A company asset. `book_value` is always derived (acquisition_cost minus
@@ -39,6 +41,26 @@ class Asset extends Model
     public function custodian(): BelongsTo
     {
         return $this->belongsTo(Custodian::class, 'custodian_id');
+    }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(AssetPhoto::class, 'asset_id')->latest('created_at');
+    }
+
+    public function custodyHandovers(): HasMany
+    {
+        return $this->hasMany(CustodyHandover::class, 'asset_id')->latest('handed_at');
+    }
+
+    public function purchase(): HasOne
+    {
+        return $this->hasOne(AssetPurchase::class, 'asset_id');
+    }
+
+    public function depreciationLines(): HasMany
+    {
+        return $this->hasMany(DepreciationLine::class, 'asset_id');
     }
 
     public function getBookValueAttribute(): string

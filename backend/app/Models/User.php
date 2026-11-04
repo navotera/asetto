@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Akunta\Rbac\Models\Entity;
 use Akunta\Rbac\Models\User as RbacUser;
+use Akunta\Rbac\Models\UserAppAssignment;
 use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -54,6 +55,69 @@ class User extends RbacUser
     public function isSsoAdmin(): bool
     {
         return session('ecopa.app_role') === 'admin';
+    }
+
+    /**
+     * Ecopa admins (app_role=admin) bypass all permission checks even before a
+     * local `admin` role is assigned. Otherwise defer to the rbac pivot logic
+     * (which itself bypasses for role code admin/super_admin).
+     */
+    public function hasPermission(string $permissionCode, ?string $entityId = null): bool
+    {
+        if ($this->isSsoAdmin()) {
+            return true;
+        }
+
+        return parent::hasPermission($permissionCode, $entityId);
+    }
+
+    public function isAssettoAdmin(): bool
+    {
+        return $this->isSsoAdmin() || $this->localRoleCode() === 'admin';
+    }
+
+    /** The user's active app-wide Asetto assignment (entity_id null). */
+    public function assettoAssignment(): ?UserAppAssignment
+    {
+        return $this->assignments()
+            ->whereNull('revoked_at')
+            ->whereNull('entity_id')
+            ->whereHas('app', fn ($q) => $q->where('code', config('ecopa.self_slug', 'asetto')))
+            ->with('role')
+            ->first();
+    }
+
+    public function localRoleCode(): ?string
+    {
+        return $this->assettoAssignment()?->role?->code;
+    }
+
+    public function localRoleName(): ?string
+    {
+        return $this->assettoAssignment()?->role?->name;
+    }
+
+    /**
+     * Effective Asetto permission codes for this user.
+     *
+     * @return array<int, string>
+     */
+    public function permissionCodes(): array
+    {
+        $all = collect(config('asetto_permissions.catalog', []))->pluck('code')->all();
+
+        if ($this->isAssettoAdmin()) {
+            return $all;
+        }
+
+        return $this->assignments()
+            ->whereNull('revoked_at')
+            ->with('role.permissions:id,code')
+            ->get()
+            ->flatMap(fn ($a) => $a->role?->permissions->pluck('code') ?? [])
+            ->unique()
+            ->values()
+            ->all();
     }
 
     protected function accessibleEntityIdsFromTenantWide(): Collection

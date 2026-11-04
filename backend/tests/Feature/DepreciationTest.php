@@ -57,14 +57,19 @@ it('posts a run, advances accumulated depreciation, and enqueues a balanced jour
         ->and($run->lines()->count())->toBeGreaterThan(0)
         ->and((float) Asset::find($assetId)->accumulated_depreciation)->toBeGreaterThan($before);
 
-    // The journal lands in the outbox with the period-stable idempotency key.
-    $journal = JournalOutbox::query()->where('idempotency_key', 'dep:2026-11')->first();
-    expect($journal)->not->toBeNull()->and($journal->status)->toBe('queued');
+    // One Auto Mapping ingest event per (entity × category) lands in the outbox.
+    // No Akunta token in tests, so it stays queued with the business payload.
+    $events = JournalOutbox::query()->where('source_ref', $run->id)->get();
+    expect($events)->not->toBeEmpty()
+        ->and($events->every(fn ($e) => $e->status === 'queued'))->toBeTrue()
+        ->and($events->every(fn ($e) => $e->source_type === 'asetto.depreciation'))->toBeTrue();
 
-    // Journal is balanced: total debits == total credits.
-    $debit = collect($journal->lines)->sum('debit');
-    $credit = collect($journal->lines)->sum('credit');
-    expect(round($debit, 2))->toBe(round($credit, 2));
+    $one = $events->first();
+    expect($one->idempotency_key)->toStartWith('asetto:dep:')
+        ->and($one->payload['event'])->toBe('depreciation')
+        ->and($one->payload['period'])->toBe('2026-11')
+        ->and((float) $one->payload['amount'])->toBeGreaterThan(0)
+        ->and($one->entity_id)->not->toBeEmpty();
 });
 
 it('refuses to post the same period twice', function () {

@@ -216,3 +216,35 @@ Semua path berikut relatif ke `C:\laragon\www\akunta`:
 - `apps/payroll/`, `apps/cash-mgmt/` — child app contoh.
 - `AGENTS.md` — aturan ekosistem (referensi, sebagian spesifik Akunta).
 - `docs/architecture.md`, `docs/spec.md`, `docs/decisions.md` — konteks domain.
+
+---
+
+## 10. Menjalankan / mencoba aplikasi (server lokal)
+
+Ada skrip **`serve.ps1`** di root repo yang menyiapkan dependency + database
+lalu menjalankan **backend Laravel** (http://localhost:8090 — port 8090 dipakai
+agar tidak bentrok dengan Akunta) dan **web SPA** (http://localhost:5180)
+sekaligus di dua jendela PowerShell.
+
+**Perintah untuk agent/AI:** bila user memerintahkan **"run"**, **"jalankan"**,
+**"jalankan server"**, **"coba aplikasi"**, atau yang semakna dengan menjalankan
+aplikasi/server, jalankan skrip ini (jangan menjalankan `php artisan serve` /
+`npm run dev` satu per satu secara manual):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\serve.ps1
+```
+
+Opsi: `-Live` (SPA memanggil backend sungguhan, bukan mock) · `-Fresh`
+(migrate:fresh --seed, reset database). Contoh: `.\serve.ps1 -Live`.
+
+**Dev login (bypass Ecopa) — LOKAL saja.** Untuk development/review tanpa Ecopa,
+ada sakelar on/off: `ASETTO_DEV_LOGIN=true` di `backend/.env` (default `false`,
+mustahil aktif di production). Saat aktif, route login mem-bypass Ecopa dan
+login sebagai dev admin (tanpa password). `serve.ps1 -Live` otomatis
+menyalakannya. Untuk SSO sungguhan nanti: set `ASETTO_DEV_LOGIN=false` + isi
+kredensial `ECOPA_*` — tidak ada perubahan kode (lihat §8.2; ini shim dev,
+bukan IdP/login password baru).
+
+Catatan: ini khusus menjalankan/mencoba aplikasi. Perintah lain seperti
+"jalankan test" tetap memakai `vendor/bin/pest`, bukan skrip ini.

@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use Akunta\Rbac\Models\App as RbacApp;
+use Akunta\Rbac\Models\Entity;
+use Akunta\Rbac\Models\Tenant;
+use App\Models\AppSetting;
 use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\Custodian;
+use App\Services\SettingsService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 /**
  * Seeds reference + sample asset data that mirrors web/src/api/mock/db.ts, so
@@ -24,11 +29,27 @@ class DatabaseSeeder extends Seeder
             ['name' => (string) config('ecopa.registration_name', 'Asetto'), 'version' => '1.0', 'enabled' => true],
         );
 
+        // Default application settings (depreciation mode, storage disk).
+        foreach (SettingsService::DEFAULTS as $key => $value) {
+            AppSetting::query()->firstOrCreate(['key' => $key], ['value' => $value]);
+        }
+
+        // RBAC: permissions catalog + preset roles.
+        $this->call(RolesSeeder::class);
+
+        // Demo entity (company) that assets + journals belong to. The id is
+        // Asetto's own; Akunta maps it to an Akunta entity via AutoMappingEntityLink.
+        $tenant = Tenant::query()->firstOrCreate(['slug' => 'default'], ['name' => 'Default']);
+        $entity = Entity::query()->firstOrCreate(
+            ['name' => 'PT Contoh Asetto'],
+            ['id' => (string) Str::ulid(), 'tenant_id' => $tenant->id],
+        );
+
         $categories = [
-            ['id' => 'cat_kendaraan', 'code' => 'KND', 'name' => 'Kendaraan', 'default_method' => 'straight_line', 'default_useful_life_months' => 96, 'akunta_asset_account' => '1-30003', 'akunta_accum_dep_account' => '1-30903', 'akunta_dep_expense_account' => '6-20003'],
-            ['id' => 'cat_komputer', 'code' => 'KMP', 'name' => 'Komputer & IT', 'default_method' => 'declining_balance', 'default_useful_life_months' => 48, 'akunta_asset_account' => '1-30002', 'akunta_accum_dep_account' => '1-30902', 'akunta_dep_expense_account' => '6-20002'],
-            ['id' => 'cat_mebel', 'code' => 'MBL', 'name' => 'Mebel & Perlengkapan', 'default_method' => 'straight_line', 'default_useful_life_months' => 60, 'akunta_asset_account' => '1-30001', 'akunta_accum_dep_account' => '1-30901', 'akunta_dep_expense_account' => '6-20001'],
-            ['id' => 'cat_mesin', 'code' => 'MSN', 'name' => 'Mesin Produksi', 'default_method' => 'straight_line', 'default_useful_life_months' => 120, 'akunta_asset_account' => '1-30004', 'akunta_accum_dep_account' => '1-30904', 'akunta_dep_expense_account' => '6-20004'],
+            ['id' => 'cat_kendaraan', 'code' => 'KND', 'name' => 'Kendaraan', 'default_method' => 'straight_line', 'default_useful_life_months' => 96],
+            ['id' => 'cat_komputer', 'code' => 'KMP', 'name' => 'Komputer & IT', 'default_method' => 'declining_balance', 'default_useful_life_months' => 48],
+            ['id' => 'cat_mebel', 'code' => 'MBL', 'name' => 'Mebel & Perlengkapan', 'default_method' => 'straight_line', 'default_useful_life_months' => 60],
+            ['id' => 'cat_mesin', 'code' => 'MSN', 'name' => 'Mesin Produksi', 'default_method' => 'straight_line', 'default_useful_life_months' => 120],
         ];
         foreach ($categories as $c) {
             AssetCategory::query()->updateOrCreate(['id' => $c['id']], $c);
@@ -57,6 +78,7 @@ class DatabaseSeeder extends Seeder
         ];
         foreach ($assets as $a) {
             $a['status'] = 'active';
+            $a['entity_id'] = $entity->id;
             Asset::query()->updateOrCreate(['code' => $a['code']], $a);
         }
     }

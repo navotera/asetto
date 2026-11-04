@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Durable record of every journal Asetto pushes to Akunta's general ledger via
- * akunta/api-client. `idempotency_key` is unique so a retry after a transient
- * failure never double-posts. `lines` holds the balanced Dr/Cr entries.
+ * Durable record of every business event Asetto emits to Akunta's Auto Mapping
+ * ingest endpoint. `idempotency_key` is unique so a retry after a transient
+ * failure never double-posts. `payload` holds the raw business JSON (no account
+ * codes — the Akunta admin maps fields → accounts once per `source_type`).
  */
 class JournalOutbox extends Model
 {
@@ -22,7 +23,7 @@ class JournalOutbox extends Model
 
     protected $casts = [
         'date' => 'date:Y-m-d',
-        'lines' => 'array',
+        'payload' => 'array',
         'posted_at' => 'datetime',
     ];
 }
