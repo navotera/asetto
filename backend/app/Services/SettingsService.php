@@ -14,9 +14,21 @@ use Illuminate\Support\Facades\Schema;
  */
 class SettingsService
 {
+    /** @var array<int, string> */
+    public const TIMEZONES = [
+        'Asia/Jakarta',
+        'Asia/Makassar',
+        'Asia/Jayapura',
+        'Asia/Singapore',
+        'UTC',
+    ];
+
     public const DEFAULTS = [
         'depreciation.mode' => 'auto_post', // auto_post | draft
         'storage.disk' => 'public',         // public | s3 | ...
+        // General app settings.
+        'general.timezone' => 'Asia/Jakarta',
+        'general.date_format' => 'd F Y',
         // Per-economic-event Akunta sync toggles (default on).
         'sync.acquisition' => '1',
         'sync.depreciation' => '1',
@@ -82,6 +94,26 @@ class SettingsService
         }
 
         return $out;
+    }
+
+    public function timezone(): string
+    {
+        $tz = trim((string) $this->get('general.timezone'));
+
+        return in_array($tz, self::TIMEZONES, true) ? $tz : 'Asia/Jakarta';
+    }
+
+    public function dateFormat(): string
+    {
+        $fmt = trim((string) $this->get('general.date_format'));
+
+        return $fmt !== '' ? $fmt : 'd F Y';
+    }
+
+    /** @return array{timezone: string, date_format: string} */
+    public function generalSettings(): array
+    {
+        return ['timezone' => $this->timezone(), 'date_format' => $this->dateFormat()];
     }
 
     /** Months a Trashed queue item is kept before the prune cron deletes it. */

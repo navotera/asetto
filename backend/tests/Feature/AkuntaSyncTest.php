@@ -137,6 +137,21 @@ it('prunes old trashed and accepted items but keeps recent ones', function () {
     expect(JournalOutbox::query()->find($newAccepted->id))->not->toBeNull();
 });
 
+it('exposes and updates general settings (timezone + date format)', function () {
+    $this->getJson('/api/settings')
+        ->assertOk()
+        ->assertJsonPath('general.timezone', 'Asia/Jakarta')
+        ->assertJsonPath('general.date_format', 'd F Y')
+        ->assertJsonStructure(['timezones']);
+
+    $this->putJson('/api/settings', ['general' => ['timezone' => 'Asia/Makassar', 'date_format' => 'd/m/Y']])
+        ->assertOk()
+        ->assertJsonPath('general.timezone', 'Asia/Makassar')
+        ->assertJsonPath('general.date_format', 'd/m/Y');
+
+    $this->putJson('/api/settings', ['general' => ['timezone' => 'Mars/Phobos']])->assertStatus(422);
+});
+
 it('reports scheduler health with the cron command and tasks', function () {
     $this->getJson('/api/scheduler/health')
         ->assertOk()

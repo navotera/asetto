@@ -11,6 +11,8 @@ import type {
   Custodian,
   CustodyHandover,
   DashboardSummary,
+  DepreciationReport,
+  DepreciationReportAsset,
   DepreciationRun,
   Disposal,
   DisposalType,
@@ -376,7 +378,7 @@ export const useSettings = () =>
 export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: Partial<Pick<AppSettings, 'mode' | 'disk' | 'sync' | 'retention'>>) => api.put<AppSettings>('/settings', v),
+    mutationFn: (v: Partial<Pick<AppSettings, 'mode' | 'disk' | 'sync' | 'retention' | 'general'>>) => api.put<AppSettings>('/settings', v),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
   });
 }
@@ -407,6 +409,19 @@ export const useDepreciationPreview = (period: string | null) =>
 
 export const useDepreciationRuns = () =>
   useQuery({ queryKey: keys.depreciationRuns, queryFn: () => api.get<DepreciationRun[]>('/depreciation/runs') });
+
+export const useDepreciationReport = (from: string, to: string) =>
+  useQuery({
+    queryKey: ['depreciation', 'report', from, to] as const,
+    queryFn: () => api.get<DepreciationReport>(`/depreciation/report?from=${from}&to=${to}`),
+  });
+
+export const useDepreciationReportCategory = (categoryId: string | null, from: string, to: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ['depreciation', 'report', from, to, categoryId] as const,
+    enabled: enabled && !!categoryId,
+    queryFn: () => api.get<DepreciationReportAsset[]>(`/depreciation/report/${categoryId}?from=${from}&to=${to}`),
+  });
 
 export function usePostDepreciation() {
   const invalidate = useInvalidateAll();

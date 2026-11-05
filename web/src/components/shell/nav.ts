@@ -28,19 +28,15 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: 'Depresiasi',
-    items: [
-      { href: '/depresiasi', label: 'Jalankan Depresiasi', icon: '↘', perm: 'depreciation.run' },
-      { href: '/depresiasi/riwayat', label: 'Riwayat Run', icon: '↻', perm: 'asset.read' },
-    ],
-  },
-  {
     title: 'Integrasi',
     items: [{ href: '/akunta', label: 'Peristiwa Ekonomi', icon: '⤤', perm: 'journal.read' }],
   },
   {
     title: 'Laporan',
-    items: [{ href: '/laporan/nilai-buku', label: 'Nilai Buku Aset', icon: '∑', perm: 'asset.read' }],
+    items: [
+      { href: '/laporan/nilai-buku', label: 'Nilai Buku Aset', icon: '∑', perm: 'asset.read' },
+      { href: '/depresiasi', label: 'Depresiasi', icon: '↘', match: ['/depresiasi'], perm: 'asset.read' },
+    ],
   },
   {
     title: 'Lainnya',

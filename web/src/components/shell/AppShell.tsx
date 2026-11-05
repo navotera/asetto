@@ -1,5 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
+import { useSettings } from '@/api/queries';
+import { setDateFormat } from '@/lib/format';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ImpersonationBanner } from './ImpersonationBanner';
@@ -9,6 +11,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true,
   );
+
+  // Apply the configured date format app-wide so formatDate() follows it.
+  const { data: settings } = useSettings();
+  useEffect(() => {
+    setDateFormat(settings?.general?.date_format);
+  }, [settings]);
 
   return (
     <div className="min-h-screen bg-page-bg">

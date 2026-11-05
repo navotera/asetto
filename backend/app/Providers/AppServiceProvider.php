@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use Akunta\EcopaClient\EcopaClient;
 use App\Services\AsettoEcopaClient;
+use App\Services\SettingsService;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +27,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Apply the configured timezone (from General settings) app-wide.
+        try {
+            if (Schema::hasTable('app_settings')) {
+                $tz = $this->app->make(SettingsService::class)->timezone();
+                config(['app.timezone' => $tz]);
+                date_default_timezone_set($tz);
+            }
+        } catch (Throwable) {
+            // Settings not available yet (e.g. during migrate) — keep the default.
+        }
     }
 }

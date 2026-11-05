@@ -162,6 +162,42 @@ export interface JournalEntry {
   posted_at: string | null;
 }
 
+export interface DepreciationReportCategory {
+  category_id: string | null;
+  category_code: string | null;
+  category_name: string;
+  asset_count: number;
+  /** Total acquisition value (nilai perolehan) of the category's assets. */
+  acquisition_cost: number;
+  /** Accumulated depreciation to date (akumulasi depresiasi). */
+  accumulated: number;
+  /** Depreciation expense within the selected range (not accumulated). */
+  total_amount: number;
+  /** Current remaining value (nilai sisa) = perolehan − akumulasi. */
+  book_value: number;
+}
+
+export interface DepreciationReport {
+  from: string;
+  to: string;
+  total_acquisition_cost: number;
+  total_accumulated: number;
+  total_amount: number;
+  total_book_value: number;
+  categories: DepreciationReportCategory[];
+}
+
+export interface DepreciationReportAsset {
+  asset_id: string;
+  asset_code: string;
+  asset_name: string;
+  periods: number;
+  acquisition_cost: number;
+  accumulated: number;
+  total_amount: number;
+  book_value: number;
+}
+
 export interface Me {
   id: string;
   name: string;
@@ -307,12 +343,20 @@ export interface RetentionSettings {
   accepted_years: number;
 }
 
+/** General app settings (timezone + date display format). */
+export interface GeneralSettings {
+  timezone: string;
+  date_format: string;
+}
+
 export interface AppSettings {
   mode: 'auto_post' | 'draft';
   disk: string;
   disks?: string[];
   sync?: SyncSettings;
   retention?: RetentionSettings;
+  general?: GeneralSettings;
+  timezones?: string[];
 }
 
 export interface DashboardSummary {

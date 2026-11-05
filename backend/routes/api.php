@@ -63,6 +63,8 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('assets/{asset}/photos', [PhotoController::class, 'index']);
         Route::get('assets/{asset}/purchase', [PurchaseController::class, 'show']);
         Route::get('depreciation/pending', [DepreciationController::class, 'pending']);
+        Route::get('depreciation/report', [DepreciationController::class, 'report']);
+        Route::get('depreciation/report/{category}', [DepreciationController::class, 'reportCategory']);
         Route::get('depreciation/preview', [DepreciationController::class, 'preview']);
         Route::get('depreciation/runs', [DepreciationController::class, 'index']);
         Route::get('depreciation/runs/{run}', [DepreciationController::class, 'show']);

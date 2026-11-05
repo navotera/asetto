@@ -11,30 +11,69 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat('id-ID').format(value);
 }
 
-/** ISO date string (YYYY-MM-DD) → "04 Nov 2026". */
+// ---------------------------------------------------------------------------
+// Configurable date format (PHP-style tokens, Indonesian names)
+// ---------------------------------------------------------------------------
+
+const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const DAYS_SHORT = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** App-wide date format, set from the General settings (default "d F Y"). */
+let dateFormat = 'd F Y';
+export function setDateFormat(fmt: string | null | undefined) {
+  if (fmt && fmt.trim()) dateFormat = fmt.trim();
+}
+export function getDateFormat() {
+  return dateFormat;
+}
+
+/** Render a Date using a PHP-style format string (subset) with Indonesian names. */
+export function formatWithPattern(d: Date, fmt: string): string {
+  let out = '';
+  for (let i = 0; i < fmt.length; i++) {
+    const c = fmt[i];
+    if (c === '\\') {
+      out += fmt[++i] ?? '';
+      continue;
+    }
+    switch (c) {
+      case 'd': out += pad(d.getDate()); break;
+      case 'j': out += String(d.getDate()); break;
+      case 'D': out += DAYS_SHORT[d.getDay()]; break;
+      case 'l': out += DAYS[d.getDay()]; break;
+      case 'F': out += MONTHS[d.getMonth()]; break;
+      case 'M': out += MONTHS_SHORT[d.getMonth()]; break;
+      case 'm': out += pad(d.getMonth() + 1); break;
+      case 'n': out += String(d.getMonth() + 1); break;
+      case 'Y': out += String(d.getFullYear()); break;
+      case 'y': out += pad(d.getFullYear() % 100); break;
+      case 'H': out += pad(d.getHours()); break;
+      case 'i': out += pad(d.getMinutes()); break;
+      case 's': out += pad(d.getSeconds()); break;
+      default: out += c;
+    }
+  }
+  return out;
+}
+
+/** ISO date string → formatted per the configured date format (default "d F Y"). */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(d);
+  return formatWithPattern(d, dateFormat);
 }
 
-/** ISO datetime → "04 Nov 2026, 14:30". */
+/** ISO datetime → configured date format + " HH:mm". */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(d);
+  return formatWithPattern(d, dateFormat + ' H:i');
 }
 
 /** "2026-11" → "November 2026". */

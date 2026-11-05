@@ -31,6 +31,9 @@ class SettingsController extends Controller
             'retention' => ['sometimes', 'array'],
             'retention.trashed_months' => ['sometimes', 'integer', 'min:0', 'max:120'],
             'retention.accepted_years' => ['sometimes', 'integer', 'min:0', 'max:50'],
+            'general' => ['sometimes', 'array'],
+            'general.timezone' => ['sometimes', Rule::in(SettingsService::TIMEZONES)],
+            'general.date_format' => ['sometimes', 'string', 'max:32'],
         ]);
 
         if (isset($data['mode'])) {
@@ -50,6 +53,12 @@ class SettingsController extends Controller
         if (isset($data['retention']['accepted_years'])) {
             $this->settings->set('retention.accepted_years', (string) (int) $data['retention']['accepted_years']);
         }
+        if (isset($data['general']['timezone'])) {
+            $this->settings->set('general.timezone', (string) $data['general']['timezone']);
+        }
+        if (isset($data['general']['date_format'])) {
+            $this->settings->set('general.date_format', (string) $data['general']['date_format']);
+        }
 
         return response()->json($this->payload());
     }
@@ -63,6 +72,8 @@ class SettingsController extends Controller
             'disks' => array_values(array_keys(config('filesystems.disks', []))),
             'sync' => $this->settings->syncSettings(),
             'retention' => $this->settings->retentionSettings(),
+            'general' => $this->settings->generalSettings(),
+            'timezones' => SettingsService::TIMEZONES,
         ];
     }
 }

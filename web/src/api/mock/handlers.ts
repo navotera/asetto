@@ -73,6 +73,10 @@ export function handle(method: string, rawPath: string, body: any): unknown {
     if (m === 'POST') return db.savePurchase(p.id, body);
   }
 
+  if (m === 'GET' && path === '/depreciation/report')
+    return db.depreciationReport(query.from || '', query.to || '');
+  if ((p = match(path, '/depreciation/report/:category')) && m === 'GET')
+    return db.depreciationReportCategory(p.category, query.from || '', query.to || '');
   if (m === 'GET' && path === '/depreciation/pending') return { period: db.pendingPeriod() };
   if (m === 'GET' && path === '/depreciation/preview')
     return db.previewRun(query.period || db.pendingPeriod() || '');

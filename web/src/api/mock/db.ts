@@ -29,6 +29,22 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
+/** Resolve a from/to range (YYYY-MM-DD); defaults to the current month. */
+function resolveRange(from: string, to: string): [string, string] {
+  const now = new Date();
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  let f = from || fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+  let t = to || fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  if (t < f) [f, t] = [t, f];
+  return [f, t];
+}
+
+/** Inclusive number of calendar months spanned by [from, to]. */
+function monthsBetween(from: string, to: string): number {
+  const f = new Date(from), t = new Date(to);
+  return Math.max(1, (t.getFullYear() - f.getFullYear()) * 12 + (t.getMonth() - f.getMonth()) + 1);
+}
+
 // ---------------------------------------------------------------------------
 // Seed data
 // ---------------------------------------------------------------------------
@@ -243,7 +259,11 @@ const settings = {
   sync: { acquisition: true, depreciation: true, disposal: true },
   // Auto-prune retention for the economic-event queue.
   retention: { trashed_months: 3, accepted_years: 2 },
+  // General app settings.
+  general: { timezone: 'Asia/Jakarta', date_format: 'd F Y' },
 };
+
+const TIMEZONES = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'Asia/Singapore', 'UTC'];
 
 // Mock Ecopa integration state — starts unconfigured so the setup wizard is
 // visible in mock mode; registering simulates an instant approval.
@@ -1012,13 +1032,14 @@ export const db = {
   }),
 
   // --- settings ---
-  getSettings: () => ({ ...settings }),
+  getSettings: () => ({ ...settings, timezones: TIMEZONES }),
   saveSettings(patch: Partial<typeof settings>) {
     if (patch.mode) settings.mode = patch.mode;
     if (patch.disk) settings.disk = patch.disk;
     if (patch.sync) settings.sync = { ...settings.sync, ...patch.sync };
     if (patch.retention) settings.retention = { ...settings.retention, ...patch.retention };
-    return { ...settings };
+    if (patch.general) settings.general = { ...settings.general, ...patch.general };
+    return { ...settings, timezones: TIMEZONES };
   },
 
   // --- rbac (mock: the mock user is admin with full access) ---
@@ -1106,6 +1127,68 @@ export const db = {
     run.journal_id = journals[before]?.id ?? null;
     runs.push(run);
     return run;
+  },
+
+  // --- depreciation report (grouped by category over a date range) ---
+  depreciationReport(from: string, to: string) {
+    const [f, t] = resolveRange(from, to);
+    const months = monthsBetween(f, t);
+    const byCat = new Map<string, any>();
+    for (const a of assets) {
+      if (a.status !== 'active' || a.method === 'none') continue;
+      const monthly = monthlyDepreciation(a);
+      if (monthly <= 0) continue;
+      const cat = categories.find((c) => c.id === a.category_id);
+      const g = byCat.get(a.category_id) ?? {
+        category_id: a.category_id,
+        category_code: cat?.code ?? null,
+        category_name: cat?.name ?? 'Tanpa kategori',
+        asset_count: 0,
+        acquisition_cost: 0,
+        accumulated: 0,
+        total_amount: 0,
+        book_value: 0,
+      };
+      g.asset_count += 1;
+      g.acquisition_cost += a.acquisition_cost;
+      g.accumulated += a.accumulated_depreciation;
+      g.total_amount += monthly * months;
+      g.book_value += Math.max(0, a.book_value);
+      byCat.set(a.category_id, g);
+    }
+    const cats = [...byCat.values()].sort((a, b) => b.total_amount - a.total_amount);
+    return {
+      from: f,
+      to: t,
+      total_acquisition_cost: cats.reduce((s, c) => s + c.acquisition_cost, 0),
+      total_accumulated: cats.reduce((s, c) => s + c.accumulated, 0),
+      total_amount: cats.reduce((s, c) => s + c.total_amount, 0),
+      total_book_value: cats.reduce((s, c) => s + c.book_value, 0),
+      categories: cats,
+    };
+  },
+  depreciationReportCategory(categoryId: string, from: string, to: string) {
+    const [f, t] = resolveRange(from, to);
+    const months = monthsBetween(f, t);
+    return assets
+      .filter((a) => a.category_id === categoryId && a.status === 'active' && a.method !== 'none')
+      .map((a) => {
+        const monthly = monthlyDepreciation(a);
+        return monthly > 0
+          ? {
+              asset_id: a.id,
+              asset_code: a.code,
+              asset_name: a.name,
+              periods: months,
+              acquisition_cost: a.acquisition_cost,
+              accumulated: a.accumulated_depreciation,
+              total_amount: monthly * months,
+              book_value: Math.max(0, a.book_value),
+            }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.asset_code.localeCompare(b.asset_code));
   },
 
   // --- disposals ---

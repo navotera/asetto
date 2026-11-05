@@ -11,6 +11,7 @@ import { EntitiesPanel } from './settings/EntitiesPanel';
 import { IntegrationPanel } from './settings/IntegrationPanel';
 import { SyncPanel } from './settings/SyncPanel';
 import { CronPanel } from './settings/CronPanel';
+import { GeneralPanel } from './settings/GeneralPanel';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -30,6 +31,7 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
+  { id: 'umum', label: 'Umum', description: 'Zona waktu & format tanggal', icon: '⚙', adminOnly: true },
   { id: 'profil', label: 'Profil Pengguna', description: 'Identitas dari Ecopa', icon: '◉' },
   { id: 'entitas', label: 'Entitas', description: 'Perusahaan (PT) & jurnal', icon: '◫', adminOnly: true },
   { id: 'depresiasi', label: 'Depresiasi Terjadwal', description: 'Mode posting otomatis', icon: '↘', adminOnly: true },
@@ -106,6 +108,8 @@ export default function SettingsPage() {
 
         {/* Right detail panel */}
         <div className="min-w-0">
+          {current?.id === 'umum' && <GeneralPanel />}
+
           {current?.id === 'profil' && (
             <Card>
               <CardHeader title="Profil Pengguna" subtitle="Identitas berasal dari Ecopa (SSO)." />
