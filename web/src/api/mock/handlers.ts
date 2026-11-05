@@ -37,8 +37,10 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if (m === 'GET' && path === '/entities') return db.entities();
   if (m === 'POST' && path === '/entities') return db.createEntity(body);
 
-  if (m === 'GET' && path === '/assets') return db.listAssets();
+  if (m === 'GET' && path === '/assets') return db.listAssets(query);
   if (m === 'GET' && path === '/assets/mine') return db.myAssets();
+  if (m === 'POST' && path === '/assets/import')
+    return db.importAssets(body.rows ?? [], !!body.commit);
   if (m === 'POST' && path === '/assets') return db.createAsset(body);
   if ((p = match(path, '/assets/:id'))) {
     if (m === 'GET') return db.getAsset(p.id) ?? notFound('Aset');

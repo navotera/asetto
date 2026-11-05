@@ -35,14 +35,6 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: 'Operasional',
-    items: [
-      { href: '/kondisi', label: 'Kondisi Aset', icon: '◍', perm: 'asset.manage' },
-      { href: '/pelimpahan', label: 'Pelimpahan', icon: '⇄', perm: 'asset.manage' },
-      { href: '/pelepasan', label: 'Pelepasan & Penjualan', icon: '⊗', perm: 'disposal.manage' },
-    ],
-  },
-  {
     title: 'Integrasi',
     items: [{ href: '/akunta', label: 'Outbox Jurnal Akunta', icon: '⤤', perm: 'journal.read' }],
   },

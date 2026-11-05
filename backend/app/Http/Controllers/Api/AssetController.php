@@ -25,13 +25,78 @@ class AssetController extends Controller
 
     private const CONDITIONS = ['good', 'needs_repair', 'broken', 'idle'];
 
+    /**
+     * Asset list. Without pagination params it returns the full array (used by
+     * reports and asset pickers). With `page`/`per_page` it applies the filters
+     * + sort and returns a paginated envelope { items, page, per_page, total,
+     * last_page }. The mock store (web/src/api/mock/db.ts) mirrors this exactly.
+     */
     public function index(Request $request): JsonResponse
     {
         $withValues = (bool) $request->user()?->hasPermission('asset.view_value');
-        $assets = Asset::query()->orderBy('code')->get()
-            ->map(fn (Asset $a) => Present::asset($a, $withValues));
+        $paginated = $request->has('page') || $request->has('per_page');
 
-        return response()->json($assets);
+        $query = Asset::query()
+            ->leftJoin('asset_categories', 'assets.category_id', '=', 'asset_categories.id')
+            ->leftJoin('custodians', 'assets.custodian_id', '=', 'custodians.id')
+            ->select('assets.*');
+
+        // Filters.
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '') {
+            $query->where(function ($w) use ($search) {
+                $w->where('assets.name', 'like', "%{$search}%")
+                    ->orWhere('assets.code', 'like', "%{$search}%");
+            });
+        }
+        foreach ([
+            'category_id' => 'assets.category_id',
+            'status' => 'assets.status',
+            'condition' => 'assets.condition',
+            'custodian_id' => 'assets.custodian_id',
+            'entity_id' => 'assets.entity_id',
+        ] as $param => $column) {
+            $value = trim((string) $request->query($param, ''));
+            if ($value !== '') {
+                $query->where($column, $value);
+            }
+        }
+
+        // Sorting.
+        $sortColumns = [
+            'code' => 'assets.code',
+            'name' => 'assets.name',
+            'category' => 'asset_categories.name',
+            'custodian' => 'custodians.name',
+            'acquisition_cost' => 'assets.acquisition_cost',
+            'condition' => 'assets.condition',
+            'status' => 'assets.status',
+        ];
+        $sort = (string) $request->query('sort', 'code');
+        $dir = strtolower((string) $request->query('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        if ($sort === 'book_value') {
+            $query->orderByRaw('(assets.acquisition_cost - assets.accumulated_depreciation) '.$dir);
+        } else {
+            $query->orderBy($sortColumns[$sort] ?? 'assets.code', $dir);
+        }
+
+        if (! $paginated) {
+            $assets = $query->get()->map(fn (Asset $a) => Present::asset($a, $withValues));
+
+            return response()->json($assets);
+        }
+
+        $perPage = min(100, max(1, (int) $request->query('per_page', 25)));
+        $page = max(1, (int) $request->query('page', 1));
+        $p = $query->paginate($perPage, ['assets.*'], 'page', $page);
+
+        return response()->json([
+            'items' => collect($p->items())->map(fn (Asset $a) => Present::asset($a, $withValues))->values(),
+            'page' => $p->currentPage(),
+            'per_page' => $p->perPage(),
+            'total' => $p->total(),
+            'last_page' => $p->lastPage(),
+        ]);
     }
 
     public function show(Request $request, Asset $asset): JsonResponse

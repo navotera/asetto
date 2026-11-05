@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import type { ImportResult, RawRow as ImportRows } from '@/lib/assetSheet';
 import type {
   AppSettings,
   Asset,
@@ -18,6 +19,7 @@ import type {
   Me,
   MyAsset,
   AssetAuditEntry,
+  Paginated,
   PermissionMatrix,
   RoleManagementData,
 } from './types';
@@ -145,6 +147,45 @@ export const useDashboard = () =>
 export const useAssets = () =>
   useQuery({ queryKey: keys.assets, queryFn: () => api.get<Asset[]>('/assets') });
 
+export interface AssetListParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  category_id?: string;
+  status?: string;
+  condition?: string;
+  custodian_id?: string;
+  entity_id?: string;
+  sort?: string;
+  dir?: 'asc' | 'desc';
+}
+
+/** Build a stable query string from the non-empty params. */
+function assetQuery(params: AssetListParams): string {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+  });
+  return qs.toString();
+}
+
+/** Server-side paginated + filtered + sorted asset page (for the list view). */
+export const useAssetsPaged = (params: AssetListParams) =>
+  useQuery({
+    queryKey: ['assets', 'paged', params] as const,
+    queryFn: () => api.get<Paginated<Asset>>(`/assets?${assetQuery(params)}`),
+    // Keep the previous page visible while the next one loads (no flash).
+    placeholderData: (prev) => prev,
+  });
+
+/** Fetch the full filtered list (no pagination) — e.g. to export everything. */
+export const fetchAssetsFiltered = (params: AssetListParams) => {
+  const { page: _p, per_page: _pp, ...rest } = params;
+  void _p;
+  void _pp;
+  return api.get<Asset[]>(`/assets?${assetQuery(rest)}`);
+};
+
 export const useAsset = (id: string) =>
   useQuery({ queryKey: keys.asset(id), queryFn: () => api.get<Asset>(`/assets/${id}`), enabled: !!id });
 
@@ -194,6 +235,16 @@ export function useSaveAsset() {
 export function useDeleteAsset() {
   const invalidate = useInvalidateAll();
   return useMutation({ mutationFn: (id: string) => api.del(`/assets/${id}`), onSuccess: invalidate });
+}
+
+export function useImportAssets() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (v: { rows: ImportRows[]; commit: boolean }) => api.post<ImportResult>('/assets/import', v),
+    onSuccess: (res) => {
+      if (res.committed) invalidate();
+    },
+  });
 }
 
 export function useSetCondition() {

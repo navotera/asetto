@@ -129,6 +129,39 @@ const fieldClass =
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(fieldClass, props.className)} />;
 }
+
+/** Group a whole-number value with thousand dots (Indonesian): 240000000 → "240.000.000". */
+export function groupThousands(value: string | number): string {
+  const digits = String(value ?? '').replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  if (digits === '') return '';
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
+ * A numeric text field that shows a thousand-separator mask (dots every 3
+ * digits) while keeping the stored value digit-only. `onChange` receives an
+ * `{ target: { value } }` with the raw digits, so it drops into the same
+ * handlers a `type="number"` <Input> used.
+ */
+export function NumberInput({
+  value,
+  onChange,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+  value: string | number;
+  onChange: (e: { target: { value: string } }) => void;
+}) {
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode="numeric"
+      value={groupThousands(value)}
+      onChange={(e) => onChange({ target: { value: e.target.value.replace(/\D/g, '') } })}
+      className={cn(fieldClass, props.className)}
+    />
+  );
+}
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={cn(fieldClass, props.className)} />;
 }

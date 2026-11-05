@@ -248,3 +248,41 @@ bukan IdP/login password baru).
 
 Catatan: ini khusus menjalankan/mencoba aplikasi. Perintah lain seperti
 "jalankan test" tetap memakai `vendor/bin/pest`, bukan skrip ini.
+
+---
+
+## 11. Konvensi UI/UX (preferensi standar user — berlaku tiap development)
+
+Ini preferensi tetap dari user (Dede). **Terapkan sebagai default di setiap
+fitur baru dan perubahan UI, tanpa perlu diminta ulang.** Jika sebuah permintaan
+bertentangan dengan salah satunya, ikuti permintaan itu lalu konfirmasi.
+
+1. **Bahasa:** seluruh teks UI dalam Bahasa Indonesia.
+2. **Input angka:** SEMUA field angka (nominal rupiah, kuantitas, bulan, dll.)
+   memakai komponen `NumberInput` (`web/src/components/ui/primitives.tsx`) →
+   mask ribuan titik gaya Indonesia (mis. `240.000.000`); nilai yang disimpan
+   tetap digit mentah. Jangan pakai `<Input type="number">` polos.
+3. **Daftar/tabel yang bisa banyak baris:** wajib ada pagination di sisi
+   **client DAN backend**, jangan render semua baris sekaligus. Pola:
+   `GET /...?page=&per_page=&<filter>&sort=&dir=` → envelope
+   `{ items, page, per_page, total, last_page }`; di-mirror di mock
+   (`web/src/api/mock/db.ts`); hook `useAssetsPaged`-style; search di-debounce;
+   halaman balik ke 1 saat filter berubah. Default 25/halaman + info
+   "Menampilkan X–Y dari Z".
+4. **Filter:** tampil sebagai **overlay popover** (mengambang di atas konten,
+   tutup via klik-luar/Esc), bukan panel inline yang mendorong tabel. Filter
+   yang pilihannya hanya dua → **radio**, bukan dropdown.
+5. **Aksi sekunder:** kelompokkan tombol (Tambah/Ubah/Hapus/Ekspor/Impor/
+   Pelepasan/dll.) ke dalam menu titik-tiga (⋮) `KebabMenu`, hindari deretan
+   banyak tombol di header.
+6. **Operasi aset** (ubah kondisi, pelimpahan, pelepasan/penjualan) dilakukan
+   dari **halaman detail aset** (menu ⋮ atau tab), bukan menu sidebar terpisah.
+7. **Ekspor/Impor:** berkas hasil ekspor sekaligus berfungsi sebagai template
+   impor (kolom identik).
+8. **Hindari duplikasi informasi** antar komponen; ringkas tampilan (mis. data
+   yang sudah ada di header/strip tidak diulang di kartu detail). Gabungkan
+   kartu terkait dengan pemisah garis bila perlu, bukan kartu terpisah-pisah.
+9. **Nav active-state:** cocokkan pada **batas segmen path** (`=== href` atau
+   diawali `href + '/'`) agar `/aset` tidak ikut aktif di `/aset-saya`.
+10. **Mock ↔ backend sinkron:** tiap perubahan kontrak API diterapkan di backend
+    Laravel DAN di mock SPA (`handlers.ts`/`db.ts`) sekaligus, dengan test.

@@ -1,5 +1,14 @@
 /** Domain types for the Asetto asset sub-ledger. */
 
+/** A server-side paginated page of T (mirrors the backend envelope). */
+export interface Paginated<T> {
+  items: T[];
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
 export type DepreciationMethod = 'straight_line' | 'declining_balance' | 'none';
 export type AssetCondition = 'good' | 'needs_repair' | 'broken' | 'idle';
 export type AssetStatus = 'active' | 'disposed';

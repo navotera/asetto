@@ -190,6 +190,43 @@ const assets: Asset[] = [
   }),
 ];
 
+// --- Dummy bulk data (dev only) — to eyeball long lists / pagination. ---
+// Remove this block to go back to the 6 hand-written seed assets.
+const DUMMY_NAMES = [
+  'Laptop Lenovo ThinkPad', 'Monitor LG 27"', 'Printer Canon', 'Meja Kerja', 'Kursi Ergonomis',
+  'AC Daikin 1PK', 'Proyektor Epson', 'Router Mikrotik', 'Server HP ProLiant', 'Scanner Fujitsu',
+  'Kamera CCTV Hikvision', 'Genset Honda', 'Forklift Hyster', 'Mobil Operasional', 'Motor Dinas',
+];
+const DUMMY_CONDITIONS: Asset['condition'][] = ['good', 'good', 'good', 'needs_repair', 'idle', 'broken'];
+for (let i = 0; i < 100; i++) {
+  const n = i + 7;
+  const cat = categories[i % categories.length];
+  const cust = custodians[i % custodians.length];
+  const ent = entities[i % entities.length];
+  const baseCost = 2_000_000 + (i % 25) * 1_500_000;
+  const year = 2019 + (i % 7);
+  const month = (i % 12) + 1;
+  assets.push(
+    seedAsset({
+      id: `ast_${n}`,
+      code: `AST-${String(n).padStart(4, '0')}`,
+      name: `${DUMMY_NAMES[i % DUMMY_NAMES.length]} ${n}`,
+      entity_id: ent.id,
+      category_id: cat.id,
+      acquisition_date: `${year}-${String(month).padStart(2, '0')}-15`,
+      acquisition_cost: baseCost,
+      salvage_value: Math.round(baseCost * 0.1),
+      useful_life_months: cat.default_useful_life_months,
+      method: cat.default_method,
+      condition: DUMMY_CONDITIONS[i % DUMMY_CONDITIONS.length],
+      custodian_id: cust.id,
+      location: `Lokasi ${1 + (i % 5)}`,
+      accumulated_depreciation: Math.round((baseCost * (i % 7)) / 10),
+      last_depreciated_period: '2026-10',
+    }),
+  );
+}
+
 const runs: DepreciationRun[] = [];
 const disposals: Disposal[] = [];
 const journals: JournalEntry[] = [];
@@ -430,6 +467,144 @@ function dashboard(): DashboardSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Bulk import (mirrors backend AssetImportController)
+// ---------------------------------------------------------------------------
+
+const METHOD_IMPORT_LABELS: Record<string, Asset['method']> = {
+  'garis lurus': 'straight_line',
+  straight_line: 'straight_line',
+  'saldo menurun': 'declining_balance',
+  declining_balance: 'declining_balance',
+  'tidak didepresiasi': 'none',
+  'tanpa depresiasi': 'none',
+  none: 'none',
+};
+
+const CONDITION_IMPORT_LABELS: Record<string, Asset['condition']> = {
+  baik: 'good',
+  good: 'good',
+  'perlu perbaikan': 'needs_repair',
+  needs_repair: 'needs_repair',
+  rusak: 'broken',
+  broken: 'broken',
+  'tidak terpakai': 'idle',
+  idle: 'idle',
+};
+
+function parseAmount(text: string): number | null {
+  const clean = String(text ?? '').replace(/[^0-9-]/g, '');
+  if (clean === '' || clean === '-') return null;
+  return Number(clean);
+}
+
+function parseDate(text: string): string | null {
+  const t = String(text ?? '').trim();
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return isValidDate(+m[1], +m[2], +m[3]) ? `${m[1]}-${m[2]}-${m[3]}` : null;
+  m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const [, d, mo, y] = m;
+    return isValidDate(+y, +mo, +d) ? `${y}-${String(+mo).padStart(2, '0')}-${String(+d).padStart(2, '0')}` : null;
+  }
+  return null;
+}
+
+function isValidDate(y: number, mo: number, d: number): boolean {
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(y, mo - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d;
+}
+
+function resolveImportRow(raw: Record<string, string>): { data: Record<string, any>; errors: string[] } {
+  const errors: string[] = [];
+  const data: Record<string, any> = {};
+  const get = (k: string) => String(raw[k] ?? '').trim();
+  const lc = (s: string) => s.toLowerCase();
+
+  data.code = get('code');
+
+  const name = get('name');
+  if (!name) errors.push('Nama aset wajib diisi.');
+  data.name = name;
+
+  const entityText = get('entity');
+  if (!entityText) errors.push('Entitas wajib diisi.');
+  else {
+    const e = entities.find((x) => x.id === entityText || lc(x.name) === lc(entityText));
+    if (!e) errors.push(`Entitas "${entityText}" tidak dikenal.`);
+    else data.entity_id = e.id;
+  }
+
+  const categoryText = get('category');
+  if (!categoryText) errors.push('Kategori wajib diisi.');
+  else {
+    const c = categories.find(
+      (x) => x.id === categoryText || lc(x.code) === lc(categoryText) || lc(x.name) === lc(categoryText),
+    );
+    if (!c) errors.push(`Kategori "${categoryText}" tidak dikenal.`);
+    else data.category_id = c.id;
+  }
+
+  const dateText = get('acquisition_date');
+  if (!dateText) errors.push('Tanggal perolehan wajib diisi.');
+  else {
+    const d = parseDate(dateText);
+    if (!d) errors.push(`Tanggal perolehan "${dateText}" tidak valid (gunakan YYYY-MM-DD).`);
+    else data.acquisition_date = d;
+  }
+
+  const costText = get('acquisition_cost');
+  if (!costText) errors.push('Nilai perolehan wajib diisi.');
+  else {
+    const v = parseAmount(costText);
+    if (v === null || v < 0) errors.push(`Nilai perolehan "${costText}" tidak valid.`);
+    else data.acquisition_cost = v;
+  }
+
+  const salvageText = get('salvage_value');
+  if (!salvageText) data.salvage_value = 0;
+  else {
+    const v = parseAmount(salvageText);
+    if (v === null || v < 0) errors.push(`Nilai residu "${salvageText}" tidak valid.`);
+    else data.salvage_value = v;
+  }
+
+  const lifeText = get('useful_life_months');
+  if (!lifeText) data.useful_life_months = 60;
+  else {
+    const v = parseAmount(lifeText);
+    if (v === null || v < 1) errors.push(`Masa manfaat "${lifeText}" tidak valid.`);
+    else data.useful_life_months = v;
+  }
+
+  const methodText = get('method');
+  if (!methodText) data.method = 'straight_line';
+  else if (METHOD_IMPORT_LABELS[lc(methodText)]) data.method = METHOD_IMPORT_LABELS[lc(methodText)];
+  else errors.push(`Metode "${methodText}" tidak dikenal (Garis Lurus / Saldo Menurun / Tidak Didepresiasi).`);
+
+  const conditionText = get('condition');
+  if (!conditionText) data.condition = 'good';
+  else if (CONDITION_IMPORT_LABELS[lc(conditionText)]) data.condition = CONDITION_IMPORT_LABELS[lc(conditionText)];
+  else errors.push(`Kondisi "${conditionText}" tidak dikenal (Baik / Perlu Perbaikan / Rusak / Tidak Terpakai).`);
+
+  const custodianText = get('custodian');
+  if (!custodianText) data.custodian_id = null;
+  else {
+    const c = custodians.find(
+      (x) => x.id === custodianText || lc(x.code) === lc(custodianText) || lc(x.name) === lc(custodianText),
+    );
+    if (!c) errors.push(`Penanggung jawab "${custodianText}" tidak dikenal.`);
+    else data.custodian_id = c.id;
+  }
+
+  data.location = get('location');
+  data.serial_number = get('serial_number') || undefined;
+  data.notes = get('notes') || undefined;
+
+  return { data, errors };
+}
+
+// ---------------------------------------------------------------------------
 // Public store API (used by the mock router)
 // ---------------------------------------------------------------------------
 
@@ -471,7 +646,50 @@ export const db = {
     return { ok: true };
   },
 
-  listAssets: () => [...assets].sort((a, b) => a.code.localeCompare(b.code)),
+  /**
+   * Asset list. Without `page`/`per_page` returns the full (sorted) array —
+   * used by reports & pickers. With them, applies filters + sort and returns a
+   * paginated envelope { items, page, per_page, total, last_page }. Mirrors the
+   * backend AssetController@index exactly.
+   */
+  listAssets(params: Record<string, string> = {}) {
+    let list = [...assets];
+
+    const search = (params.search ?? '').toLowerCase().trim();
+    if (search) list = list.filter((a) => a.name.toLowerCase().includes(search) || a.code.toLowerCase().includes(search));
+    if (params.category_id) list = list.filter((a) => a.category_id === params.category_id);
+    if (params.status) list = list.filter((a) => a.status === params.status);
+    if (params.condition) list = list.filter((a) => a.condition === params.condition);
+    if (params.custodian_id) list = list.filter((a) => (a.custodian_id ?? '') === params.custodian_id);
+    if (params.entity_id) list = list.filter((a) => a.entity_id === params.entity_id);
+
+    const accessors: Record<string, (a: Asset) => string | number> = {
+      code: (a) => a.code,
+      name: (a) => a.name.toLowerCase(),
+      category: (a) => categoryName(a.category_id).toLowerCase(),
+      custodian: (a) => (custodianNameById(a.custodian_id) ?? '').toLowerCase(),
+      acquisition_cost: (a) => a.acquisition_cost ?? 0,
+      book_value: (a) => a.book_value ?? 0,
+      condition: (a) => a.condition,
+      status: (a) => a.status,
+    };
+    const acc = accessors[params.sort ?? 'code'] ?? accessors.code;
+    const dir = params.dir === 'desc' ? -1 : 1;
+    list.sort((x, y) => {
+      const av = acc(x), bv = acc(y);
+      return (av < bv ? -1 : av > bv ? 1 : 0) * dir;
+    });
+
+    const paginated = params.page !== undefined || params.per_page !== undefined;
+    if (!paginated) return list;
+
+    const perPage = Math.min(100, Math.max(1, Number(params.per_page) || 25));
+    const page = Math.max(1, Number(params.page) || 1);
+    const total = list.length;
+    const lastPage = Math.max(1, Math.ceil(total / perPage));
+    const start = (page - 1) * perPage;
+    return { items: list.slice(start, start + perPage), page, per_page: perPage, total, last_page: lastPage };
+  },
   getAsset: (assetId: string) => assets.find((a) => a.id === assetId) ?? null,
 
   createAsset(input: Partial<Asset>): Asset {
@@ -496,6 +714,50 @@ export const db = {
     assets.push(asset);
     auditPush(asset.id, 'created', 'Aset dibuat.');
     return asset;
+  },
+
+  importAssets(rows: Record<string, string>[], commit: boolean) {
+    const existingCodes = new Set(assets.map((a) => a.code.toLowerCase()));
+    const seenCodes = new Map<string, number>();
+
+    const results = rows.map((raw, i) => {
+      const { data, errors } = resolveImportRow(raw ?? {});
+      const code = String(data.code ?? '').toLowerCase();
+      if (code) {
+        if (existingCodes.has(code)) errors.push('Kode sudah dipakai aset lain.');
+        else if (seenCodes.has(code)) errors.push(`Kode ganda di dalam berkas (baris ${(seenCodes.get(code) ?? 0) + 1}).`);
+        else seenCodes.set(code, i);
+      }
+      return { row: i + 1, input: raw, name: data.name ?? (raw?.name ?? ''), resolved: data, errors, valid: errors.length === 0 };
+    });
+
+    const valid = results.filter((r) => r.valid);
+    const summary = { total: results.length, valid: valid.length, invalid: results.length - valid.length };
+
+    if (!commit) return { committed: false, summary, rows: results };
+
+    let created = 0;
+    for (const r of valid) {
+      const d = r.resolved;
+      db.createAsset({
+        code: d.code || undefined,
+        name: d.name,
+        entity_id: d.entity_id,
+        category_id: d.category_id,
+        acquisition_date: d.acquisition_date,
+        acquisition_cost: d.acquisition_cost,
+        salvage_value: d.salvage_value,
+        useful_life_months: d.useful_life_months,
+        method: d.method,
+        condition: d.condition,
+        custodian_id: d.custodian_id,
+        location: d.location,
+        serial_number: d.serial_number,
+        notes: d.notes,
+      });
+      created++;
+    }
+    return { committed: true, created, skipped: summary.invalid, summary, rows: results };
   },
 
   updateAsset(assetId: string, input: Partial<Asset>): Asset {

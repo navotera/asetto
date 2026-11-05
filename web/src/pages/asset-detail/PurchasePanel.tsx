@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAssetPurchase, useSavePurchase } from '@/api/queries';
-import { Card, CardHeader, Button, Field, Input, Textarea, Spinner, LoadingBlock } from '@/components/ui/primitives';
+import { Card, CardHeader, Button, Field, Input, NumberInput, Textarea, Spinner, LoadingBlock } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
 import type { Asset } from '@/api/types';
 
@@ -72,7 +72,7 @@ export function PurchasePanel({ asset }: { asset: Asset }) {
             <Input type="date" value={form.purchase_date} onChange={(e) => set('purchase_date', e.target.value)} />
           </Field>
           <Field label="Nilai Pembelian (Rp)">
-            <Input type="number" min={0} value={form.amount} onChange={(e) => set('amount', e.target.value)} />
+            <NumberInput value={form.amount} onChange={(e) => set('amount', e.target.value)} />
           </Field>
           <div className="sm:col-span-2">
             <Field label="Catatan">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Button, Field, Input, Select, Textarea, Spinner } from '@/components/ui/primitives';
+import { Button, Field, Input, NumberInput, Select, Textarea, Spinner } from '@/components/ui/primitives';
 import { useCategories, useCustodians, useEntities, useSaveAsset } from '@/api/queries';
 import { useToast } from '@/components/ui/toast';
 import type { Asset, DepreciationMethod } from '@/api/types';
@@ -55,9 +55,10 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
     if (open) setForm(toForm(asset));
   }, [open, asset]);
 
-  // When creating, default life/method from the chosen category.
+  // Method + useful life ALWAYS follow the chosen category (read-only fields),
+  // on both create and edit.
   useEffect(() => {
-    if (asset || !categories) return;
+    if (!categories) return;
     const cat = categories.find((c) => c.id === form.category_id);
     if (cat) {
       setForm((f) => ({
@@ -67,7 +68,7 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.category_id]);
+  }, [form.category_id, categories]);
 
   const set = (k: keyof FormState) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -138,24 +139,31 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
             ))}
           </Select>
         </Field>
-        <Field label="Metode Depresiasi">
-          <Select value={form.method} onChange={set('method')}>
-            {Object.entries(methodLabels).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </Select>
+        <Field label="Metode Depresiasi" hint="Mengikuti kategori terpilih.">
+          <Input
+            readOnly
+            tabIndex={-1}
+            value={methodLabels[form.method]}
+            className="cursor-not-allowed bg-page-bg text-text-muted"
+          />
         </Field>
         <Field label="Tanggal Perolehan">
           <Input type="date" value={form.acquisition_date} onChange={set('acquisition_date')} />
         </Field>
-        <Field label="Masa Manfaat (bulan)">
-          <Input type="number" min={1} value={form.useful_life_months} onChange={set('useful_life_months')} />
+        <Field label="Masa Manfaat (bulan)" hint="Mengikuti kategori terpilih.">
+          <NumberInput
+            readOnly
+            tabIndex={-1}
+            value={form.useful_life_months}
+            onChange={set('useful_life_months')}
+            className="cursor-not-allowed bg-page-bg text-text-muted"
+          />
         </Field>
         <Field label="Nilai Perolehan (Rp)">
-          <Input type="number" min={0} value={form.acquisition_cost} onChange={set('acquisition_cost')} />
+          <NumberInput value={form.acquisition_cost} onChange={set('acquisition_cost')} />
         </Field>
         <Field label="Nilai Residu (Rp)" hint="Nilai sisa di akhir masa manfaat.">
-          <Input type="number" min={0} value={form.salvage_value} onChange={set('salvage_value')} />
+          <NumberInput value={form.salvage_value} onChange={set('salvage_value')} />
         </Field>
         <Field label="Penanggung Jawab">
           <Select value={form.custodian_id} onChange={set('custodian_id')}>

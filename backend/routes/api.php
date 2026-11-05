@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CustodianController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepreciationController;
+use App\Http\Controllers\Api\AssetImportController;
 use App\Http\Controllers\Api\DisposalController;
 use App\Http\Controllers\Api\EcopaRegistrationController;
 use App\Http\Controllers\Api\EntityController;
@@ -72,6 +73,7 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::patch('categories/{category}', [CategoryController::class, 'update']);
         Route::delete('categories/{category}', [CategoryController::class, 'destroy']);
         Route::post('assets', [AssetController::class, 'store']);
+        Route::post('assets/import', [AssetImportController::class, 'import']);
         Route::patch('assets/{asset}', [AssetController::class, 'update']);
         Route::delete('assets/{asset}', [AssetController::class, 'destroy']);
         Route::post('assets/{asset}/condition', [AssetController::class, 'setCondition']);

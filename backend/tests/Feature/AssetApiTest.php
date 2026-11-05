@@ -43,6 +43,30 @@ it('lists seeded assets sorted by code with a derived book value', function () {
         ->assertJsonPath('0.book_value', 168000000); // 240M cost − 72M accumulated
 });
 
+it('paginates assets when page params are given', function () {
+    $res = $this->getJson('/api/assets?page=1&per_page=2&sort=code&dir=asc')
+        ->assertOk()
+        ->assertJsonPath('page', 1)
+        ->assertJsonPath('per_page', 2)
+        ->assertJsonPath('total', 6)
+        ->assertJsonPath('last_page', 3)
+        ->assertJsonPath('items.0.code', 'AST-0001');
+
+    expect($res->json('items'))->toHaveCount(2);
+
+    // Page 2 continues the sequence.
+    $this->getJson('/api/assets?page=2&per_page=2&sort=code&dir=asc')
+        ->assertOk()
+        ->assertJsonPath('items.0.code', 'AST-0003');
+});
+
+it('filters the paginated list by search', function () {
+    $this->getJson('/api/assets?page=1&per_page=25&search=MacBook')
+        ->assertOk()
+        ->assertJsonPath('total', 1)
+        ->assertJsonPath('items.0.code', 'AST-0002');
+});
+
 it('creates an asset and auto-generates a code', function () {
     $this->postJson('/api/assets', [
         'name' => 'Printer Epson',

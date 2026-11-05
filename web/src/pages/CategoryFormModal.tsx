@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSaveCategory } from '@/api/queries';
 import { Modal } from '@/components/ui/Modal';
-import { Button, Field, Input, Select, Spinner } from '@/components/ui/primitives';
+import { Button, Field, Input, NumberInput, Select, Spinner } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
 import type { AssetCategory, DepreciationMethod } from '@/api/types';
 
@@ -84,9 +84,7 @@ export function CategoryFormModal({
           </Select>
         </Field>
         <Field label="Masa Manfaat (bulan)">
-          <Input
-            type="number"
-            min={1}
+          <NumberInput
             value={form.default_useful_life_months}
             onChange={(e) => set('default_useful_life_months', Number(e.target.value))}
           />

@@ -5,8 +5,9 @@ import { navGroups, type NavItem } from './nav';
 
 function isActive(item: NavItem, pathname: string): boolean {
   if (item.href === '/') return pathname === '/';
-  if (pathname === item.href) return true;
-  return (item.match ?? [item.href]).some((m) => pathname.startsWith(m));
+  // Match on path-segment boundaries so "/aset" stays active on "/aset/:id"
+  // but NOT on a sibling like "/aset-saya".
+  return (item.match ?? [item.href]).some((m) => pathname === m || pathname.startsWith(m + '/'));
 }
 
 export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
