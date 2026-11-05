@@ -19,6 +19,7 @@ import type {
   Me,
   MyAsset,
   AssetAuditEntry,
+  IntegrationStatus,
   Paginated,
   PermissionMatrix,
   RoleManagementData,
@@ -332,6 +333,27 @@ export function useSavePurchase(assetId: string) {
   return useMutation({
     mutationFn: (form: FormData) => api.upload<AssetPurchase>(`/assets/${assetId}/purchase`, form),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.assetPurchase(assetId) }),
+  });
+}
+
+// --- Ecopa integration (first-access wizard) ---
+export const useIntegrationStatus = () =>
+  useQuery({ queryKey: ['integration', 'status'], queryFn: () => api.get<IntegrationStatus>('/integration/status') });
+
+export function useRegisterIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { ecopa_url: string; registration_token: string; base_url?: string }) =>
+      api.post<IntegrationStatus>('/integration/register', v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integration'] }),
+  });
+}
+
+export function useCancelIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<IntegrationStatus>('/integration/register/cancel'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integration'] }),
   });
 }
 

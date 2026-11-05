@@ -237,6 +237,23 @@ const assetPhotos: Record<string, any[]> = {};
 const assetPurchases: Record<string, any> = {};
 const settings = { mode: 'auto_post' as 'auto_post' | 'draft', disk: 'public', disks: ['public', 's3'] };
 
+// Mock Ecopa integration state — starts unconfigured so the setup wizard is
+// visible in mock mode; registering simulates an instant approval.
+let integration = {
+  configured: false,
+  integration_status: null as 'on' | 'off' | null,
+  registration_status: null as 'pending' | 'active' | 'rejected' | null,
+  registration_message: null as string | null,
+  name: 'Asetto',
+  slug: 'asetto',
+  ecopa_url: 'https://home.opensynergic.com',
+  base_url: '',
+  redirect_uri: '',
+  webhook_url: '',
+  sso_ready: false,
+  webhook_ready: false,
+};
+
 const custodianNameById = (id: string | null) => custodians.find((c) => c.id === id)?.name ?? null;
 
 const assetAudit: Record<string, any[]> = {};
@@ -913,6 +930,43 @@ export const db = {
       });
     }
     return purchase;
+  },
+
+  // --- Ecopa integration (mock: register simulates instant approval) ---
+  integrationStatus: () => ({ ...integration }),
+  registerIntegration(body: { ecopa_url?: string; registration_token?: string; base_url?: string }) {
+    const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const base = (body.base_url || '').replace(/\/+$/, '') || fallbackOrigin;
+    const ecopa = (body.ecopa_url || integration.ecopa_url).replace(/\/+$/, '');
+    integration = {
+      ...integration,
+      configured: true,
+      integration_status: 'on',
+      registration_status: 'active',
+      registration_message: null,
+      ecopa_url: ecopa,
+      base_url: base,
+      redirect_uri: `${base}/auth/ecopa/callback`,
+      webhook_url: `${base}/webhooks/ecopa`,
+      sso_ready: true,
+      webhook_ready: true,
+    };
+    return { ...integration };
+  },
+  cancelIntegration() {
+    integration = {
+      ...integration,
+      configured: false,
+      integration_status: null,
+      registration_status: null,
+      registration_message: null,
+      base_url: '',
+      redirect_uri: '',
+      webhook_url: '',
+      sso_ready: false,
+      webhook_ready: false,
+    };
+    return { ...integration };
   },
 
   // --- settings ---

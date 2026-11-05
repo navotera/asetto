@@ -25,6 +25,10 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   const m = method.toUpperCase();
   let p: Record<string, string> | null;
 
+  if (m === 'GET' && path === '/integration/status') return db.integrationStatus();
+  if (m === 'POST' && path === '/integration/register') return db.registerIntegration(body ?? {});
+  if (m === 'POST' && path === '/integration/register/cancel') return db.cancelIntegration();
+
   if (m === 'GET' && path === '/me') return db.me();
   if (m === 'GET' && path === '/dashboard') return db.dashboard();
   if (m === 'GET' && path === '/categories') return db.categories();

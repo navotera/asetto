@@ -29,6 +29,9 @@ class EcopaRegistrationController extends Controller
         $data = $request->validate([
             'ecopa_url' => ['required', 'string', 'max:255'],
             'registration_token' => ['required', 'string', 'max:255'],
+            // Origin publik Asetto — sumber kebenaran untuk redirect_uri & webhook.
+            // Opsional: bila kosong, backend memakai APP_URL sebagai prefill.
+            'base_url' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         try {
@@ -66,6 +69,8 @@ class EcopaRegistrationController extends Controller
             'name' => $status['name'],
             'slug' => $status['slug'],
             'ecopa_url' => $status['ecopa_url'],
+            'base_url' => $status['base_url'],
+            'redirect_uri' => $status['redirect_uri'],
             'webhook_url' => $status['webhook_url'],
             'sso_ready' => $status['sso_ready'],
             'webhook_ready' => $status['webhook_ready'],

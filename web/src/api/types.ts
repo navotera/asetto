@@ -9,6 +9,22 @@ export interface Paginated<T> {
   last_page: number;
 }
 
+/** Public Ecopa integration status (no secrets) — drives the setup wizard. */
+export interface IntegrationStatus {
+  configured: boolean;
+  integration_status: 'on' | 'off' | null;
+  registration_status: 'pending' | 'active' | 'rejected' | null;
+  registration_message: string | null;
+  name: string;
+  slug: string;
+  ecopa_url: string;
+  base_url: string;
+  redirect_uri: string;
+  webhook_url: string;
+  sso_ready: boolean;
+  webhook_ready: boolean;
+}
+
 export type DepreciationMethod = 'straight_line' | 'declining_balance' | 'none';
 export type AssetCondition = 'good' | 'needs_repair' | 'broken' | 'idle';
 export type AssetStatus = 'active' | 'disposed';

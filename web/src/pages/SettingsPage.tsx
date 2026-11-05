@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMe, useSettings, useSaveSettings, useCan } from '@/api/queries';
-import { api } from '@/api/client';
 import { PageHeader, Card, CardHeader, Badge, Field, Select, Spinner } from '@/components/ui/primitives';
 import { cn } from '@/lib/cn';
 import { useToast } from '@/components/ui/toast';
@@ -8,6 +7,7 @@ import { UserRolesPanel } from './settings/UserRolesPanel';
 import { RoleMatrixPanel } from './settings/RoleMatrixPanel';
 import { CustodianLinkPanel } from './settings/CustodianLinkPanel';
 import { EntitiesPanel } from './settings/EntitiesPanel';
+import { IntegrationPanel } from './settings/IntegrationPanel';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -149,22 +149,7 @@ export default function SettingsPage() {
           {current?.id === 'roles' && <RoleMatrixPanel />}
           {current?.id === 'custodian' && <CustodianLinkPanel />}
 
-          {current?.id === 'integrasi' && (
-            <Card>
-              <CardHeader title="Integrasi" subtitle="Identitas lewat Ecopa; data akuntansi dikirim ke Akunta." />
-              <Row
-                label="Mode API"
-                value={
-                  api.mode === 'mock'
-                    ? <Badge tone="warning">Mock (data contoh di browser)</Badge>
-                    : <Badge tone="success">Live (backend Asetto)</Badge>
-                }
-              />
-              <Row label="Identity Provider" value="Ecopa — OIDC (silent SSO)" />
-              <Row label="General Ledger" value="Akunta — REST api-client (server-to-server)" />
-              <Row label="Posting jurnal" value="Idempoten, mengikuti periode & invariant Akunta" />
-            </Card>
-          )}
+          {current?.id === 'integrasi' && <IntegrationPanel />}
         </div>
       </div>
     </div>

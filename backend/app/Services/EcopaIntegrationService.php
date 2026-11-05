@@ -55,6 +55,7 @@ class EcopaIntegrationService
             'base_url' => $values->get('base_url', $this->configuredBaseUrl()),
             'ecopa_url' => $values->get('ecopa_url', rtrim((string) config('ecopa.url'), '/')),
             'webhook_url' => $values->get('webhook_url', $this->webhookUrl()),
+            'redirect_uri' => $values->get('redirect_uri', $this->callbackUrl()),
             'sso_ready' => $this->clientId() !== null && $this->clientSecret() !== null,
             'webhook_ready' => $this->keyIntegration() !== null,
         ];
@@ -64,7 +65,7 @@ class EcopaIntegrationService
      * The browser submits only Ecopa URL + Registration Token; this backend
      * calls Ecopa and the token is never returned to the SPA.
      *
-     * @param  array{ecopa_url: string, registration_token: string}  $input
+     * @param  array{ecopa_url: string, registration_token: string, base_url?: string|null}  $input
      * @return array<string, mixed>
      */
     public function requestIntegratedRegistration(array $input): array
@@ -76,7 +77,10 @@ class EcopaIntegrationService
 
         $ecopaUrl = rtrim(trim($input['ecopa_url']), '/');
         $token = trim($input['registration_token']);
-        $baseUrl = $this->configuredBaseUrl();
+        // Operator-provided origin is the source of truth; APP_URL is only a
+        // fallback prefill when the field is left blank.
+        $baseUrlInput = trim((string) ($input['base_url'] ?? ''));
+        $baseUrl = $baseUrlInput !== '' ? rtrim($baseUrlInput, '/') : $this->configuredBaseUrl();
 
         $this->assertAllowedUrl($ecopaUrl, 'Ecopa URL', rejectPrivateHosts: true);
         $this->assertAllowedUrl($baseUrl, 'Base URL Asetto');
@@ -300,9 +304,15 @@ class EcopaIntegrationService
         return rtrim((string) (config('ecopa.registration_base_url') ?: config('app.url')), '/');
     }
 
+    /** The effective child origin: operator-stored base_url, else APP_URL. */
+    private function effectiveBaseUrl(): string
+    {
+        return $this->value('base_url') ?: $this->configuredBaseUrl();
+    }
+
     private function callbackUrl(): string
     {
-        return $this->configuredBaseUrl().'/auth/ecopa/callback';
+        return rtrim($this->effectiveBaseUrl(), '/').'/auth/ecopa/callback';
     }
 
     private function webhookUrl(?string $baseUrl = null): string
