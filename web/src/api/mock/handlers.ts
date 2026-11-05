@@ -87,10 +87,12 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if (m === 'GET' && path === '/journals') return db.listJournals();
   if ((p = match(path, '/journals/:id')) && m === 'GET') return db.getJournal(p.id) ?? notFound('Jurnal');
   if ((p = match(path, '/journals/:id/retry')) && m === 'POST') return db.retryJournal(p.id);
+  if ((p = match(path, '/journals/:id/trash')) && m === 'POST') return db.trashJournal(p.id);
 
   if ((p = match(path, '/depreciation/runs/:id/commit')) && m === 'POST')
     return db.getRun(p.id) ?? notFound('Run');
 
+  if (m === 'GET' && path === '/scheduler/health') return db.schedulerHealth();
   if (m === 'GET' && path === '/settings') return db.getSettings();
   if (m === 'PUT' && path === '/settings') return db.saveSettings(body);
 

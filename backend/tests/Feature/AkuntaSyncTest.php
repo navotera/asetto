@@ -9,6 +9,7 @@ use App\Services\AkuntaPostingService;
 use App\Services\SettingsService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -97,4 +98,49 @@ it('exposes and updates per-event sync settings', function () {
         ->assertJsonPath('sync.depreciation', true);
 
     expect(app(SettingsService::class)->syncEnabled('acquisition'))->toBeFalse();
+});
+
+it('trashes an unsuccessful item but leaves an accepted one', function () {
+    $failed = makeOutbox(['status' => 'failed']);
+    $accepted = makeOutbox(['status' => 'accepted']);
+
+    $this->postJson("/api/journals/{$failed->id}/trash")->assertOk()->assertJsonPath('status', 'trashed');
+    $this->postJson("/api/journals/{$accepted->id}/trash")->assertOk()->assertJsonPath('status', 'accepted');
+});
+
+it('exposes and updates retention settings', function () {
+    $this->getJson('/api/settings')
+        ->assertOk()
+        ->assertJsonPath('retention.trashed_months', 3)
+        ->assertJsonPath('retention.accepted_years', 2);
+
+    $this->putJson('/api/settings', ['retention' => ['trashed_months' => 6, 'accepted_years' => 5]])
+        ->assertOk()
+        ->assertJsonPath('retention.trashed_months', 6)
+        ->assertJsonPath('retention.accepted_years', 5);
+});
+
+it('prunes old trashed and accepted items but keeps recent ones', function () {
+    $oldTrashed = makeOutbox(['status' => 'trashed']);
+    DB::table('journal_outbox')->where('id', $oldTrashed->id)->update(['updated_at' => now()->subMonths(4)]);
+    $newTrashed = makeOutbox(['status' => 'trashed']);
+
+    $oldAccepted = makeOutbox(['status' => 'accepted']);
+    DB::table('journal_outbox')->where('id', $oldAccepted->id)->update(['created_at' => now()->subYears(3)]);
+    $newAccepted = makeOutbox(['status' => 'accepted']);
+
+    $this->artisan('asetto:prune-journals')->assertSuccessful();
+
+    expect(JournalOutbox::query()->find($oldTrashed->id))->toBeNull();
+    expect(JournalOutbox::query()->find($newTrashed->id))->not->toBeNull();
+    expect(JournalOutbox::query()->find($oldAccepted->id))->toBeNull();
+    expect(JournalOutbox::query()->find($newAccepted->id))->not->toBeNull();
+});
+
+it('reports scheduler health with the cron command and tasks', function () {
+    $this->getJson('/api/scheduler/health')
+        ->assertOk()
+        ->assertJsonPath('scheduler.healthy', false)
+        ->assertJsonStructure(['scheduler' => ['healthy', 'cron_command', 'working_directory', 'threshold_seconds'], 'tasks'])
+        ->assertJsonCount(3, 'tasks');
 });

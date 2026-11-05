@@ -241,6 +241,8 @@ const settings = {
   disks: ['public', 's3'],
   // Per-economic-event Akunta sync toggles. Off → that event is not pushed.
   sync: { acquisition: true, depreciation: true, disposal: true },
+  // Auto-prune retention for the economic-event queue.
+  retention: { trashed_months: 3, accepted_years: 2 },
 };
 
 // Mock Ecopa integration state — starts unconfigured so the setup wizard is
@@ -992,12 +994,30 @@ export const db = {
     return { ...integration };
   },
 
+  // --- scheduler / cron health (mock: cron not set up by default) ---
+  schedulerHealth: () => ({
+    scheduler: {
+      healthy: false,
+      last: null,
+      age_seconds: null,
+      threshold_seconds: 180,
+      working_directory: 'C:\\laragon\\www\\asetto\\backend',
+      cron_command: "* * * * * cd '/path/ke/asetto/backend' && php artisan schedule:run >> /dev/null 2>&1",
+    },
+    tasks: [
+      { command: 'asetto:flush-outbox', label: 'Kirim ulang antrean jurnal ke Akunta', schedule: 'Setiap 5 menit' },
+      { command: 'asetto:run-depreciation', label: 'Depresiasi bulanan otomatis', schedule: 'Setiap tanggal 28 pukul 02:00' },
+      { command: 'asetto:prune-journals', label: 'Bersihkan antrean lama (Trashed / Berhasil)', schedule: 'Setiap hari pukul 01:30' },
+    ],
+  }),
+
   // --- settings ---
   getSettings: () => ({ ...settings }),
   saveSettings(patch: Partial<typeof settings>) {
     if (patch.mode) settings.mode = patch.mode;
     if (patch.disk) settings.disk = patch.disk;
     if (patch.sync) settings.sync = { ...settings.sync, ...patch.sync };
+    if (patch.retention) settings.retention = { ...settings.retention, ...patch.retention };
     return { ...settings };
   },
 
@@ -1163,6 +1183,12 @@ export const db = {
     if (!journal) throw new ApiMockError(404, 'Jurnal tidak ditemukan');
     if (journal.status === 'accepted') return journal;
     pushToAkunta(journal, true);
+    return journal;
+  },
+  trashJournal(journalId: string): JournalEntry {
+    const journal = journals.find((j) => j.id === journalId);
+    if (!journal) throw new ApiMockError(404, 'Jurnal tidak ditemukan');
+    if (journal.status !== 'accepted') journal.status = 'trashed';
     return journal;
   },
 

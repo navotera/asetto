@@ -23,6 +23,7 @@ import type {
   Paginated,
   PermissionMatrix,
   RoleManagementData,
+  SchedulerHealth,
 } from './types';
 
 export const keys = {
@@ -336,6 +337,17 @@ export function useSavePurchase(assetId: string) {
   });
 }
 
+// --- scheduler / cron health ---
+export function useSchedulerHealth(enabled = true) {
+  return useQuery({
+    queryKey: ['scheduler', 'health'],
+    enabled,
+    retry: false,
+    refetchInterval: 60_000,
+    queryFn: () => api.get<SchedulerHealth>('/scheduler/health'),
+  });
+}
+
 // --- Ecopa integration (first-access wizard) ---
 export const useIntegrationStatus = () =>
   useQuery({ queryKey: ['integration', 'status'], queryFn: () => api.get<IntegrationStatus>('/integration/status') });
@@ -364,7 +376,7 @@ export const useSettings = () =>
 export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: Partial<Pick<AppSettings, 'mode' | 'disk' | 'sync'>>) => api.put<AppSettings>('/settings', v),
+    mutationFn: (v: Partial<Pick<AppSettings, 'mode' | 'disk' | 'sync' | 'retention'>>) => api.put<AppSettings>('/settings', v),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
   });
 }
@@ -425,6 +437,14 @@ export function useRetryJournal() {
   const invalidate = useInvalidateAll();
   return useMutation({
     mutationFn: (id: string) => api.post<JournalEntry>(`/journals/${id}/retry`),
+    onSuccess: invalidate,
+  });
+}
+
+export function useTrashJournal() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) => api.post<JournalEntry>(`/journals/${id}/trash`),
     onSuccess: invalidate,
   });
 }

@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useSettings, useSaveSettings } from '@/api/queries';
-import { Card, CardHeader, LoadingBlock } from '@/components/ui/primitives';
+import { Card, CardHeader, LoadingBlock, Field, Input, Button, Spinner } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
-import type { SyncSettings } from '@/api/types';
+import type { SyncSettings, RetentionSettings } from '@/api/types';
 
 const EVENTS: { key: keyof SyncSettings; label: string; desc: string }[] = [
   { key: 'acquisition', label: 'Perolehan', desc: 'Kapitalisasi aset saat data pembelian diisi.' },
@@ -36,6 +37,16 @@ export function SyncPanel() {
   const save = useSaveSettings();
   const toast = useToast();
 
+  const [trashedMonths, setTrashedMonths] = useState('3');
+  const [acceptedYears, setAcceptedYears] = useState('2');
+
+  useEffect(() => {
+    if (settings?.retention) {
+      setTrashedMonths(String(settings.retention.trashed_months));
+      setAcceptedYears(String(settings.retention.accepted_years));
+    }
+  }, [settings]);
+
   if (!settings) {
     return (
       <Card>
@@ -55,21 +66,56 @@ export function SyncPanel() {
     }
   }
 
+  async function saveRetention() {
+    const retention: RetentionSettings = {
+      trashed_months: Math.max(0, Number(trashedMonths) || 0),
+      accepted_years: Math.max(0, Number(acceptedYears) || 0),
+    };
+    try {
+      await save.mutateAsync({ retention });
+      toast('success', 'Retensi disimpan.');
+    } catch {
+      toast('error', 'Gagal menyimpan retensi.');
+    }
+  }
+
   return (
-    <Card>
-      <CardHeader
-        title="Sinkronisasi Akunta"
-        subtitle="Pilih peristiwa ekonomi mana yang dikirim ke Akunta. Yang dimatikan tidak masuk antrean."
-      />
-      {EVENTS.map((e) => (
-        <div key={e.key} className="flex items-center justify-between gap-4 border-b border-border-soft px-5 py-4 last:border-0">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-text-default">{e.label}</div>
-            <div className="text-xs text-text-muted">{e.desc}</div>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader
+          title="Sinkronisasi Akunta"
+          subtitle="Pilih peristiwa ekonomi mana yang dikirim ke Akunta. Yang dimatikan tidak masuk antrean."
+        />
+        {EVENTS.map((e) => (
+          <div key={e.key} className="flex items-center justify-between gap-4 border-b border-border-soft px-5 py-4 last:border-0">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-text-default">{e.label}</div>
+              <div className="text-xs text-text-muted">{e.desc}</div>
+            </div>
+            <Toggle on={sync[e.key]} disabled={save.isPending} onChange={(v) => toggle(e.key, v)} />
           </div>
-          <Toggle on={sync[e.key]} disabled={save.isPending} onChange={(v) => toggle(e.key, v)} />
+        ))}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Retensi antrean"
+          subtitle="Pembersihan otomatis antrean oleh cron. Nilai 0 = jangan hapus otomatis."
+        />
+        <div className="flex flex-col gap-4 px-5 py-4">
+          <Field label="Hapus item Trashed setelah (bulan)" hint="Antrean yang dibuang dihapus permanen setelah masa ini.">
+            <Input type="number" min={0} value={trashedMonths} onChange={(e) => setTrashedMonths(e.target.value)} />
+          </Field>
+          <Field label="Hapus item Berhasil setelah (tahun)" hint="Riwayat yang sudah berhasil dihapus setelah masa ini.">
+            <Input type="number" min={0} value={acceptedYears} onChange={(e) => setAcceptedYears(e.target.value)} />
+          </Field>
+          <div>
+            <Button onClick={saveRetention} disabled={save.isPending}>
+              {save.isPending && <Spinner />} Simpan retensi
+            </Button>
+          </div>
         </div>
-      ))}
-    </Card>
+      </Card>
+    </div>
   );
 }

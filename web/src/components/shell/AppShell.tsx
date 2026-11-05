@@ -3,6 +3,7 @@ import { cn } from '@/lib/cn';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ImpersonationBanner } from './ImpersonationBanner';
+import { SchedulerAlert } from './SchedulerAlert';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(() =>
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <div className={cn('flex min-h-screen flex-col transition-[padding] duration-200', sidebarOpen ? 'lg:pl-64' : 'pl-0')}>
         <Topbar onToggleSidebar={() => setSidebarOpen((v) => !v)} />
+        <SchedulerAlert />
         <ImpersonationBanner />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>
       </div>

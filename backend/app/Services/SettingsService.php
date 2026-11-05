@@ -21,6 +21,9 @@ class SettingsService
         'sync.acquisition' => '1',
         'sync.depreciation' => '1',
         'sync.disposal' => '1',
+        // Auto-prune retention for the economic-event queue.
+        'retention.trashed_months' => '3',
+        'retention.accepted_years' => '2',
     ];
 
     public const SYNC_EVENTS = ['acquisition', 'depreciation', 'disposal'];
@@ -79,6 +82,27 @@ class SettingsService
         }
 
         return $out;
+    }
+
+    /** Months a Trashed queue item is kept before the prune cron deletes it. */
+    public function retentionTrashedMonths(): int
+    {
+        return max(0, (int) $this->get('retention.trashed_months', 3));
+    }
+
+    /** Years an accepted queue item is kept before the prune cron deletes it. */
+    public function retentionAcceptedYears(): int
+    {
+        return max(0, (int) $this->get('retention.accepted_years', 2));
+    }
+
+    /** @return array{trashed_months: int, accepted_years: int} */
+    public function retentionSettings(): array
+    {
+        return [
+            'trashed_months' => $this->retentionTrashedMonths(),
+            'accepted_years' => $this->retentionAcceptedYears(),
+        ];
     }
 
     /** Disk uploaded files are written to (falls back to a disk that exists). */

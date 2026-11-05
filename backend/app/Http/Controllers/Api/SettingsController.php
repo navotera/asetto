@@ -28,6 +28,9 @@ class SettingsController extends Controller
             'sync.acquisition' => ['sometimes', 'boolean'],
             'sync.depreciation' => ['sometimes', 'boolean'],
             'sync.disposal' => ['sometimes', 'boolean'],
+            'retention' => ['sometimes', 'array'],
+            'retention.trashed_months' => ['sometimes', 'integer', 'min:0', 'max:120'],
+            'retention.accepted_years' => ['sometimes', 'integer', 'min:0', 'max:50'],
         ]);
 
         if (isset($data['mode'])) {
@@ -41,6 +44,12 @@ class SettingsController extends Controller
                 $this->settings->set('sync.'.$event, $enabled ? '1' : '0');
             }
         }
+        if (isset($data['retention']['trashed_months'])) {
+            $this->settings->set('retention.trashed_months', (string) (int) $data['retention']['trashed_months']);
+        }
+        if (isset($data['retention']['accepted_years'])) {
+            $this->settings->set('retention.accepted_years', (string) (int) $data['retention']['accepted_years']);
+        }
 
         return response()->json($this->payload());
     }
@@ -53,6 +62,7 @@ class SettingsController extends Controller
             'disk' => (string) $this->settings->get('storage.disk'),
             'disks' => array_values(array_keys(config('filesystems.disks', []))),
             'sync' => $this->settings->syncSettings(),
+            'retention' => $this->settings->retentionSettings(),
         ];
     }
 }

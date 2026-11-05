@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMe, useSettings, useSaveSettings, useCan } from '@/api/queries';
 import { PageHeader, Card, CardHeader, Badge, Field, Select, Spinner } from '@/components/ui/primitives';
 import { cn } from '@/lib/cn';
@@ -9,6 +10,7 @@ import { CustodianLinkPanel } from './settings/CustodianLinkPanel';
 import { EntitiesPanel } from './settings/EntitiesPanel';
 import { IntegrationPanel } from './settings/IntegrationPanel';
 import { SyncPanel } from './settings/SyncPanel';
+import { CronPanel } from './settings/CronPanel';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -32,6 +34,7 @@ const SECTIONS: Section[] = [
   { id: 'entitas', label: 'Entitas', description: 'Perusahaan (PT) & jurnal', icon: '◫', adminOnly: true },
   { id: 'depresiasi', label: 'Depresiasi Terjadwal', description: 'Mode posting otomatis', icon: '↘', adminOnly: true },
   { id: 'sinkron', label: 'Sinkronisasi Akunta', description: 'Peristiwa ekonomi ke Akunta', icon: '⤤', adminOnly: true },
+  { id: 'cron', label: 'Penjadwalan (Cron)', description: 'Status scheduler & tugas', icon: '⏱', adminOnly: true },
   { id: 'penyimpanan', label: 'Penyimpanan File', description: 'Disk foto & bukti', icon: '▤', adminOnly: true },
   { id: 'users', label: 'User & Roles', description: 'Assign role & impersonate', icon: '♙', adminOnly: true },
   { id: 'roles', label: 'Role Management', description: 'Matriks izin role', icon: '✓', adminOnly: true },
@@ -48,8 +51,15 @@ export default function SettingsPage() {
   const isAdmin = me?.app_role === 'admin' || can('settings.manage');
 
   const sections = useMemo(() => SECTIONS.filter((s) => !s.adminOnly || isAdmin), [isAdmin]);
-  const [active, setActive] = useState('profil');
+  const [searchParams] = useSearchParams();
+  const [active, setActive] = useState(searchParams.get('section') ?? 'profil');
   const current = sections.find((s) => s.id === active) ?? sections[0];
+
+  // Deep-link to a section via ?section=… (e.g. from the Peristiwa Ekonomi cog).
+  useEffect(() => {
+    const s = searchParams.get('section');
+    if (s) setActive(s);
+  }, [searchParams]);
 
   async function update(patch: { mode?: 'auto_post' | 'draft'; disk?: string }) {
     try {
@@ -147,6 +157,7 @@ export default function SettingsPage() {
           )}
 
           {current?.id === 'sinkron' && <SyncPanel />}
+          {current?.id === 'cron' && <CronPanel />}
           {current?.id === 'entitas' && <EntitiesPanel />}
           {current?.id === 'users' && <UserRolesPanel />}
           {current?.id === 'roles' && <RoleMatrixPanel />}

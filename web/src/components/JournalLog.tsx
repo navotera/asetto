@@ -18,6 +18,7 @@ const STATUS_TABS: { key: JournalStatus | 'all'; label: string }[] = [
   { key: 'queued', label: 'Antre' },
   { key: 'failed', label: 'Gagal' },
   { key: 'rejected', label: 'Ditolak' },
+  { key: 'trashed', label: 'Trashed' },
 ];
 
 function eventAmount(j: JournalEntry): number {
@@ -37,6 +38,8 @@ export function JournalLog({
   isLoading,
   onRetry,
   retryingId,
+  onTrash,
+  trashingId,
   assetLink,
   emptyText = 'Belum ada peristiwa.',
 }: {
@@ -44,6 +47,8 @@ export function JournalLog({
   isLoading?: boolean;
   onRetry: (id: string) => void;
   retryingId?: string | null;
+  onTrash?: (id: string) => void;
+  trashingId?: string | null;
   assetLink?: AssetLinkResolver;
   emptyText?: string;
 }) {
@@ -51,15 +56,17 @@ export function JournalLog({
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const list = journals ?? [];
+  // "Semua" is the active queue (everything except Trashed); Trashed is its own tab.
+  const activeList = list.filter((j) => j.status !== 'trashed');
   const count = (s: JournalStatus) => list.filter((j) => j.status === s).length;
-  const rows = tab === 'all' ? list : list.filter((j) => j.status === tab);
+  const rows = tab === 'all' ? activeList : list.filter((j) => j.status === tab);
 
   return (
     <div>
       {/* Status tabs with a subtle count badge each. */}
       <div className="flex flex-wrap gap-1 border-b border-border-soft px-2">
         {STATUS_TABS.map((t) => {
-          const n = t.key === 'all' ? list.length : count(t.key);
+          const n = t.key === 'all' ? activeList.length : count(t.key);
           const active = tab === t.key;
           return (
             <button
@@ -100,6 +107,7 @@ export function JournalLog({
               const meta = sourceMeta[j.source];
               const link = assetLink?.(j) ?? null;
               const canRetry = j.status === 'failed' || j.status === 'rejected';
+              const canTrash = !!onTrash && (j.status === 'queued' || j.status === 'failed' || j.status === 'rejected');
               const isOpen = expanded === j.id;
               return (
                 <Fragment key={j.id}>
@@ -124,15 +132,30 @@ export function JournalLog({
                     <Td align="right" className="font-mono">{formatIDR(eventAmount(j))}</Td>
                     <Td align="center"><JournalStatusBadge status={j.status} /></Td>
                     <Td align="right">
-                      {canRetry ? (
-                        <Button
-                          variant="secondary"
-                          className="px-3 py-1"
-                          onClick={() => onRetry(j.id)}
-                          disabled={retryingId === j.id}
-                        >
-                          {retryingId === j.id && <Spinner />} Kirim ulang
-                        </Button>
+                      {canRetry || canTrash ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          {canRetry && (
+                            <Button
+                              variant="secondary"
+                              className="px-3 py-1"
+                              onClick={() => onRetry(j.id)}
+                              disabled={retryingId === j.id}
+                            >
+                              {retryingId === j.id && <Spinner />} Kirim ulang
+                            </Button>
+                          )}
+                          {canTrash && (
+                            <Button
+                              variant="ghost"
+                              className="px-2 py-1 text-text-muted hover:text-danger"
+                              title="Buang ke Trashed"
+                              onClick={() => onTrash?.(j.id)}
+                              disabled={trashingId === j.id}
+                            >
+                              {trashingId === j.id ? <Spinner /> : 'Buang'}
+                            </Button>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-xs text-text-muted">—</span>
                       )}

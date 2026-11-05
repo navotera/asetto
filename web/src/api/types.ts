@@ -25,6 +25,19 @@ export interface IntegrationStatus {
   webhook_ready: boolean;
 }
 
+/** Scheduler/cron health for the Settings UI + the app-wide alert. */
+export interface SchedulerHealth {
+  scheduler: {
+    healthy: boolean;
+    last: string | null;
+    age_seconds: number | null;
+    threshold_seconds: number;
+    working_directory: string;
+    cron_command: string;
+  };
+  tasks: { command: string; label: string; schedule: string }[];
+}
+
 export type DepreciationMethod = 'straight_line' | 'declining_balance' | 'none';
 export type AssetCondition = 'good' | 'needs_repair' | 'broken' | 'idle';
 export type AssetStatus = 'active' | 'disposed';
@@ -123,7 +136,7 @@ export interface Disposal {
   status: RunStatus;
 }
 
-export type JournalStatus = 'queued' | 'accepted' | 'failed' | 'rejected';
+export type JournalStatus = 'queued' | 'accepted' | 'failed' | 'rejected' | 'trashed';
 export type JournalSource = 'acquisition' | 'depreciation' | 'disposal';
 
 /**
@@ -288,11 +301,18 @@ export interface SyncSettings {
   disposal: boolean;
 }
 
+/** Auto-prune retention for the economic-event queue. */
+export interface RetentionSettings {
+  trashed_months: number;
+  accepted_years: number;
+}
+
 export interface AppSettings {
   mode: 'auto_post' | 'draft';
   disk: string;
   disks?: string[];
   sync?: SyncSettings;
+  retention?: RetentionSettings;
 }
 
 export interface DashboardSummary {

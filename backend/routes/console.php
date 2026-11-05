@@ -16,6 +16,11 @@ Artisan::command('inspire', function () {
 | or in production via a single system cron calling `schedule:run` each minute.
 */
 
+// Every minute — heartbeat so the UI can confirm cron + scheduler are wired up.
+Schedule::command('asetto:scheduler-heartbeat')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // Retry the Akunta journal queue often, so anything stuck (e.g. Akunta offline)
 // is delivered as soon as it comes back.
 Schedule::command('asetto:flush-outbox')
@@ -25,4 +30,9 @@ Schedule::command('asetto:flush-outbox')
 // Monthly depreciation (auto-post or draft, per settings).
 Schedule::command('asetto:run-depreciation')
     ->monthlyOn(28, '02:00')
+    ->withoutOverlapping();
+
+// Prune the economic-event queue per retention settings (Trashed / Accepted).
+Schedule::command('asetto:prune-journals')
+    ->dailyAt('01:30')
     ->withoutOverlapping();

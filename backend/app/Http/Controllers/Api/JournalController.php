@@ -36,4 +36,14 @@ class JournalController extends Controller
 
         return response()->json(Present::journal($journal->refresh()));
     }
+
+    /** Move an unsuccessful queue item to Trashed (pruned by cron per retention). */
+    public function trash(JournalOutbox $journal): JsonResponse
+    {
+        if ($journal->status !== 'accepted') {
+            $journal->forceFill(['status' => 'trashed'])->save();
+        }
+
+        return response()->json(Present::journal($journal->refresh()));
+    }
 }

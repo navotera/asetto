@@ -21,6 +21,7 @@ const journalMeta: Record<JournalStatus, { tone: 'success' | 'warning' | 'danger
   queued: { tone: 'warning', label: 'Antre' },
   failed: { tone: 'danger', label: 'Gagal' },
   rejected: { tone: 'neutral', label: 'Ditolak' },
+  trashed: { tone: 'neutral', label: 'Trashed' },
 };
 export function JournalStatusBadge({ status }: { status: JournalStatus }) {
   const m = journalMeta[status];

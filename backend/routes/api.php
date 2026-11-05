@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\PermissionMatrixController;
 use App\Http\Controllers\Api\PhotoController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\RoleManagementController;
+use App\Http\Controllers\Api\SchedulerHealthController;
 use App\Http\Controllers\Api\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -92,12 +93,14 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('journals', [JournalController::class, 'index']);
         Route::get('journals/{journal}', [JournalController::class, 'show']);
         Route::post('journals/{journal}/retry', [JournalController::class, 'retry']);
+        Route::post('journals/{journal}/trash', [JournalController::class, 'trash']);
     });
 
     // Admin: settings, custodian linking, role management, permission matrix.
     Route::middleware('perm:settings.manage')->group(function () {
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);
+        Route::get('scheduler/health', [SchedulerHealthController::class, 'index']);
         Route::patch('custodians/{custodian}', [CustodianController::class, 'link']);
         Route::post('entities', [EntityController::class, 'store']);
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAssetJournals, useRetryJournal } from '@/api/queries';
+import { useAssetJournals, useRetryJournal, useTrashJournal } from '@/api/queries';
 import { Card, CardHeader } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
 import { JournalLog } from '@/components/JournalLog';
@@ -9,8 +9,10 @@ import type { Asset } from '@/api/types';
 export function JournalPanel({ asset }: { asset: Asset }) {
   const { data: journals, isLoading } = useAssetJournals(asset.id);
   const retry = useRetryJournal();
+  const trash = useTrashJournal();
   const toast = useToast();
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [trashingId, setTrashingId] = useState<string | null>(null);
 
   async function doRetry(id: string) {
     setRetryingId(id);
@@ -21,6 +23,18 @@ export function JournalPanel({ asset }: { asset: Asset }) {
       toast('error', 'Gagal mengirim ulang.');
     } finally {
       setRetryingId(null);
+    }
+  }
+
+  async function doTrash(id: string) {
+    setTrashingId(id);
+    try {
+      await trash.mutateAsync(id);
+      toast('success', 'Dipindahkan ke Trashed.');
+    } catch {
+      toast('error', 'Gagal memindahkan ke Trashed.');
+    } finally {
+      setTrashingId(null);
     }
   }
 
@@ -35,6 +49,8 @@ export function JournalPanel({ asset }: { asset: Asset }) {
         isLoading={isLoading}
         onRetry={doRetry}
         retryingId={retryingId}
+        onTrash={doTrash}
+        trashingId={trashingId}
         emptyText="Belum ada jurnal untuk aset ini."
       />
     </Card>
