@@ -16,10 +16,11 @@ export function AssetStatusBadge({ status }: { status: AssetStatus }) {
   return status === 'active' ? <Badge tone="primary">Aktif</Badge> : <Badge tone="neutral">Dilepas</Badge>;
 }
 
-const journalMeta: Record<JournalStatus, { tone: 'success' | 'warning' | 'danger'; label: string }> = {
-  accepted: { tone: 'success', label: 'Diterima' },
+const journalMeta: Record<JournalStatus, { tone: 'success' | 'warning' | 'danger' | 'neutral'; label: string }> = {
+  accepted: { tone: 'success', label: 'Berhasil' },
   queued: { tone: 'warning', label: 'Antre' },
   failed: { tone: 'danger', label: 'Gagal' },
+  rejected: { tone: 'neutral', label: 'Ditolak' },
 };
 export function JournalStatusBadge({ status }: { status: JournalStatus }) {
   const m = journalMeta[status];

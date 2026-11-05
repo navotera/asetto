@@ -24,6 +24,7 @@ import { PhotosPanel } from './asset-detail/PhotosPanel';
 import { DepreciationPanel } from './asset-detail/DepreciationPanel';
 import { PurchasePanel } from './asset-detail/PurchasePanel';
 import { AuditPanel } from './asset-detail/AuditPanel';
+import { JournalPanel } from './asset-detail/JournalPanel';
 import type { Asset, AssetCondition, DisposalType } from '@/api/types';
 
 const CONDITION_OPTIONS: { value: AssetCondition; label: string }[] = [
@@ -46,6 +47,7 @@ const TABS = [
   { key: 'foto', label: 'Foto' },
   { key: 'depresiasi', label: 'Depresiasi' },
   { key: 'pembelian', label: 'Pembelian' },
+  { key: 'jurnal', label: 'Jurnal' },
   { key: 'audit', label: 'Audit' },
 ] as const;
 
@@ -327,6 +329,7 @@ export default function AssetDetailPage() {
       {tab === 'foto' && <PhotosPanel asset={asset} />}
       {tab === 'depresiasi' && <DepreciationPanel asset={asset} />}
       {tab === 'pembelian' && <PurchasePanel asset={asset} />}
+      {tab === 'jurnal' && <JournalPanel asset={asset} />}
       {tab === 'audit' && <AuditPanel asset={asset} />}
 
       <AssetFormModal open={editing} onClose={() => setEditing(false)} asset={asset} />

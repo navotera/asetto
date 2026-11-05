@@ -58,6 +58,7 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('assets/{asset}/custody-history', [AssetController::class, 'custodyHistory']);
         Route::get('assets/{asset}/depreciation', [AssetController::class, 'depreciationHistory']);
         Route::get('assets/{asset}/audit', [AssetController::class, 'auditTrail']);
+        Route::get('assets/{asset}/journals', [AssetController::class, 'journals']);
         Route::get('assets/{asset}/photos', [PhotoController::class, 'index']);
         Route::get('assets/{asset}/purchase', [PurchaseController::class, 'show']);
         Route::get('depreciation/pending', [DepreciationController::class, 'pending']);

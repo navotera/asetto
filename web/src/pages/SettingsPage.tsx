@@ -8,6 +8,7 @@ import { RoleMatrixPanel } from './settings/RoleMatrixPanel';
 import { CustodianLinkPanel } from './settings/CustodianLinkPanel';
 import { EntitiesPanel } from './settings/EntitiesPanel';
 import { IntegrationPanel } from './settings/IntegrationPanel';
+import { SyncPanel } from './settings/SyncPanel';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -30,6 +31,7 @@ const SECTIONS: Section[] = [
   { id: 'profil', label: 'Profil Pengguna', description: 'Identitas dari Ecopa', icon: '◉' },
   { id: 'entitas', label: 'Entitas', description: 'Perusahaan (PT) & jurnal', icon: '◫', adminOnly: true },
   { id: 'depresiasi', label: 'Depresiasi Terjadwal', description: 'Mode posting otomatis', icon: '↘', adminOnly: true },
+  { id: 'sinkron', label: 'Sinkronisasi Akunta', description: 'Peristiwa ekonomi ke Akunta', icon: '⤤', adminOnly: true },
   { id: 'penyimpanan', label: 'Penyimpanan File', description: 'Disk foto & bukti', icon: '▤', adminOnly: true },
   { id: 'users', label: 'User & Roles', description: 'Assign role & impersonate', icon: '♙', adminOnly: true },
   { id: 'roles', label: 'Role Management', description: 'Matriks izin role', icon: '✓', adminOnly: true },
@@ -144,6 +146,7 @@ export default function SettingsPage() {
             </Card>
           )}
 
+          {current?.id === 'sinkron' && <SyncPanel />}
           {current?.id === 'entitas' && <EntitiesPanel />}
           {current?.id === 'users' && <UserRolesPanel />}
           {current?.id === 'roles' && <RoleMatrixPanel />}

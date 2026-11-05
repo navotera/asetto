@@ -61,6 +61,8 @@ export function handle(method: string, rawPath: string, body: any): unknown {
     return db.assetDepreciation(p.id);
   if ((p = match(path, '/assets/:id/audit')) && m === 'GET')
     return db.assetAudit(p.id);
+  if ((p = match(path, '/assets/:id/journals')) && m === 'GET')
+    return db.assetJournals(p.id);
   if ((p = match(path, '/assets/:id/photos'))) {
     if (m === 'GET') return db.listPhotos(p.id);
     if (m === 'POST') return db.addPhoto(p.id, body);

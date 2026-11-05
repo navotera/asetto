@@ -123,7 +123,7 @@ export interface Disposal {
   status: RunStatus;
 }
 
-export type JournalStatus = 'queued' | 'accepted' | 'failed';
+export type JournalStatus = 'queued' | 'accepted' | 'failed' | 'rejected';
 export type JournalSource = 'acquisition' | 'depreciation' | 'disposal';
 
 /**
@@ -281,10 +281,18 @@ export interface AssetDepreciationEntry {
   posted_at: string | null;
 }
 
+/** Per-economic-event Akunta sync toggles. */
+export interface SyncSettings {
+  acquisition: boolean;
+  depreciation: boolean;
+  disposal: boolean;
+}
+
 export interface AppSettings {
   mode: 'auto_post' | 'draft';
   disk: string;
   disks?: string[];
+  sync?: SyncSettings;
 }
 
 export interface DashboardSummary {

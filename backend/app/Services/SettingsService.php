@@ -17,7 +17,13 @@ class SettingsService
     public const DEFAULTS = [
         'depreciation.mode' => 'auto_post', // auto_post | draft
         'storage.disk' => 'public',         // public | s3 | ...
+        // Per-economic-event Akunta sync toggles (default on).
+        'sync.acquisition' => '1',
+        'sync.depreciation' => '1',
+        'sync.disposal' => '1',
     ];
+
+    public const SYNC_EVENTS = ['acquisition', 'depreciation', 'disposal'];
 
     public function get(string $key, mixed $default = null): mixed
     {
@@ -51,6 +57,28 @@ class SettingsService
         $mode = (string) $this->get('depreciation.mode');
 
         return in_array($mode, ['auto_post', 'draft'], true) ? $mode : 'auto_post';
+    }
+
+    /** Whether a given economic event ('acquisition'|'depreciation'|'disposal') syncs to Akunta. */
+    public function syncEnabled(string $source): bool
+    {
+        $value = $this->get('sync.'.$source, true);
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return ! in_array(strtolower(trim((string) $value)), ['0', 'false', 'off', 'no', ''], true);
+    }
+
+    /** @return array<string, bool> */
+    public function syncSettings(): array
+    {
+        $out = [];
+        foreach (self::SYNC_EVENTS as $event) {
+            $out[$event] = $this->syncEnabled($event);
+        }
+
+        return $out;
     }
 
     /** Disk uploaded files are written to (falls back to a disk that exists). */

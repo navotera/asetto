@@ -31,7 +31,10 @@ use Throwable;
  */
 class AkuntaPostingService
 {
-    public function __construct(private readonly AutoMappingClient $client) {}
+    public function __construct(
+        private readonly AutoMappingClient $client,
+        private readonly SettingsService $settings,
+    ) {}
 
     /**
      * Acquisition (B): emitted when purchase data is entered. Dr {asset} /
@@ -39,6 +42,9 @@ class AkuntaPostingService
      */
     public function postAcquisition(Asset $asset): ?JournalOutbox
     {
+        if (! $this->settings->syncEnabled('acquisition')) {
+            return null;
+        }
         $purchase = $asset->purchase;
         if (! $purchase || ! $asset->entity_id) {
             return null;
@@ -84,6 +90,9 @@ class AkuntaPostingService
      */
     public function postDepreciationRun(DepreciationRun $run): array
     {
+        if (! $this->settings->syncEnabled('depreciation')) {
+            return [];
+        }
         $groups = [];
         foreach ($run->lines as $line) {
             $asset = Asset::query()->with('category')->find($line->asset_id);
@@ -136,6 +145,9 @@ class AkuntaPostingService
      */
     public function postDisposal(Disposal $disposal, Asset $asset): ?JournalOutbox
     {
+        if (! $this->settings->syncEnabled('disposal')) {
+            return null;
+        }
         if (! $asset->entity_id) {
             return null;
         }
@@ -253,12 +265,16 @@ class AkuntaPostingService
                 'posted_at' => now(),
             ])->save();
         } catch (Throwable $e) {
-            Log::warning('asetto.akunta.ingest_failed', [
+            // 4xx = permanent rejection (fix payload/mapping, no blind retry);
+            // 5xx / network = transient failure (eligible for the flush cron).
+            $code = $e->getCode();
+            $status = (is_int($code) && $code >= 400 && $code < 500) ? 'rejected' : 'failed';
+            Log::warning('asetto.akunta.ingest_'.$status, [
                 'idempotency_key' => $outbox->idempotency_key,
                 'source_type' => $outbox->source_type,
                 'error' => $e->getMessage(),
             ]);
-            $outbox->forceFill(['status' => 'failed', 'last_error' => $e->getMessage()])->save();
+            $outbox->forceFill(['status' => $status, 'last_error' => $e->getMessage()])->save();
         }
     }
 }

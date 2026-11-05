@@ -10,6 +10,7 @@ use App\Models\AssetAuditLog;
 use App\Models\AssetCategory;
 use App\Models\Custodian;
 use App\Models\CustodyHandover;
+use App\Models\JournalOutbox;
 use App\Support\AssetAudit;
 use App\Support\Present;
 use Illuminate\Http\JsonResponse;
@@ -236,6 +237,18 @@ class AssetController extends Controller
                 'actor_name' => $r->actor_name,
                 'created_at' => $r->created_at?->toIso8601String(),
             ]);
+
+        return response()->json($rows);
+    }
+
+    /** Economic-event journals that point at this asset (acquisition + disposal). */
+    public function journals(Asset $asset): JsonResponse
+    {
+        $rows = JournalOutbox::query()
+            ->where('source_ref', $asset->id)
+            ->latest('created_at')
+            ->get()
+            ->map(fn (JournalOutbox $j) => Present::journal($j));
 
         return response()->json($rows);
     }

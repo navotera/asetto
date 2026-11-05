@@ -24,6 +24,10 @@ class SettingsController extends Controller
         $data = $request->validate([
             'mode' => ['sometimes', Rule::in(['auto_post', 'draft'])],
             'disk' => ['sometimes', 'string', 'max:32'],
+            'sync' => ['sometimes', 'array'],
+            'sync.acquisition' => ['sometimes', 'boolean'],
+            'sync.depreciation' => ['sometimes', 'boolean'],
+            'sync.disposal' => ['sometimes', 'boolean'],
         ]);
 
         if (isset($data['mode'])) {
@@ -31,6 +35,11 @@ class SettingsController extends Controller
         }
         if (isset($data['disk'])) {
             $this->settings->set('storage.disk', $data['disk']);
+        }
+        foreach (($data['sync'] ?? []) as $event => $enabled) {
+            if (in_array($event, SettingsService::SYNC_EVENTS, true)) {
+                $this->settings->set('sync.'.$event, $enabled ? '1' : '0');
+            }
         }
 
         return response()->json($this->payload());
@@ -43,6 +52,7 @@ class SettingsController extends Controller
             'mode' => $this->settings->depreciationMode(),
             'disk' => (string) $this->settings->get('storage.disk'),
             'disks' => array_values(array_keys(config('filesystems.disks', []))),
+            'sync' => $this->settings->syncSettings(),
         ];
     }
 }

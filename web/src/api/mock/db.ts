@@ -235,7 +235,13 @@ const journals: JournalEntry[] = [];
 const custodyHistory: Record<string, any[]> = {};
 const assetPhotos: Record<string, any[]> = {};
 const assetPurchases: Record<string, any> = {};
-const settings = { mode: 'auto_post' as 'auto_post' | 'draft', disk: 'public', disks: ['public', 's3'] };
+const settings = {
+  mode: 'auto_post' as 'auto_post' | 'draft',
+  disk: 'public',
+  disks: ['public', 's3'],
+  // Per-economic-event Akunta sync toggles. Off → that event is not pushed.
+  sync: { acquisition: true, depreciation: true, disposal: true },
+};
 
 // Mock Ecopa integration state — starts unconfigured so the setup wizard is
 // visible in mock mode; registering simulates an instant approval.
@@ -375,7 +381,11 @@ function emitEvent(
     payload: Record<string, unknown>;
   },
   forceOk = false,
-): JournalEntry {
+): JournalEntry | null {
+  // Respect the per-event Akunta sync toggle.
+  if (!settings.sync[e.source as keyof typeof settings.sync]) {
+    return null;
+  }
   const now = new Date().toISOString();
   const journal: JournalEntry = {
     id: id('jrn'),
@@ -436,18 +446,31 @@ function emitDepreciationEvents(run: DepreciationRun) {
   }
 }
 
-/** Simulate ingest to Akunta. ~1 in 12 queued pushes "fail" so the retry UI has
- *  something to show; retry always succeeds (202 → accepted + raw_id). */
+/** Simulate ingest to Akunta. For variety the mock produces all four outcomes
+ *  (accepted / queued / failed / rejected); retry (forceOk) always accepts. */
 function pushToAkunta(journal: JournalEntry, forceOk = false) {
-  const ok = forceOk || Math.random() > 0.08;
-  if (ok) {
+  if (forceOk) {
     journal.status = 'accepted';
     journal.akunta_raw_id = `raw_${new Date().getFullYear()}_${String(++seq).padStart(5, '0')}`;
     journal.last_error = null;
     journal.posted_at = new Date().toISOString();
-  } else {
+    return;
+  }
+  const r = Math.random();
+  if (r < 0.64) {
+    journal.status = 'accepted';
+    journal.akunta_raw_id = `raw_${new Date().getFullYear()}_${String(++seq).padStart(5, '0')}`;
+    journal.last_error = null;
+    journal.posted_at = new Date().toISOString();
+  } else if (r < 0.78) {
+    journal.status = 'queued';
+    journal.last_error = null;
+  } else if (r < 0.9) {
     journal.status = 'failed';
     journal.last_error = 'Akunta tidak merespons (simulasi offline).';
+  } else {
+    journal.status = 'rejected';
+    journal.last_error = 'Ditolak Akunta: payload tidak sesuai mapping periode.';
   }
 }
 
@@ -974,6 +997,7 @@ export const db = {
   saveSettings(patch: Partial<typeof settings>) {
     if (patch.mode) settings.mode = patch.mode;
     if (patch.disk) settings.disk = patch.disk;
+    if (patch.sync) settings.sync = { ...settings.sync, ...patch.sync };
     return { ...settings };
   },
 
@@ -1123,7 +1147,7 @@ export const db = {
       proceeds,
       book_value_at_disposal: bookValue,
       gain_loss: gainLoss,
-      journal_id: journal.id,
+      journal_id: journal?.id ?? null,
       status: 'posted',
     };
     disposals.push(disposal);
@@ -1132,6 +1156,7 @@ export const db = {
 
   // --- akunta outbox ---
   listJournals: () => [...journals].reverse(),
+  assetJournals: (assetId: string) => [...journals].reverse().filter((j) => j.source_ref === assetId),
   getJournal: (journalId: string) => journals.find((j) => j.id === journalId) ?? null,
   retryJournal(journalId: string): JournalEntry {
     const journal = journals.find((j) => j.id === journalId);

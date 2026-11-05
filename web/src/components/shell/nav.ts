@@ -36,7 +36,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     title: 'Integrasi',
-    items: [{ href: '/akunta', label: 'Outbox Jurnal Akunta', icon: '⤤', perm: 'journal.read' }],
+    items: [{ href: '/akunta', label: 'Peristiwa Ekonomi', icon: '⤤', perm: 'journal.read' }],
   },
   {
     title: 'Laporan',

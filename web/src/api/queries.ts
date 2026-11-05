@@ -364,10 +364,17 @@ export const useSettings = () =>
 export function useSaveSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: Partial<Pick<AppSettings, 'mode' | 'disk'>>) => api.put<AppSettings>('/settings', v),
+    mutationFn: (v: Partial<Pick<AppSettings, 'mode' | 'disk' | 'sync'>>) => api.put<AppSettings>('/settings', v),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
   });
 }
+
+export const useAssetJournals = (assetId: string) =>
+  useQuery({
+    queryKey: ['assets', assetId, 'journals'] as const,
+    enabled: !!assetId,
+    queryFn: () => api.get<JournalEntry[]>(`/assets/${assetId}/journals`),
+  });
 
 // --- depreciation ---
 export const usePendingPeriod = () =>

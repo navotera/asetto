@@ -47,7 +47,12 @@ class AutoMappingClient
             ]);
 
         if (! $response->successful()) {
-            throw new RuntimeException('Auto-mapping ingest gagal ('.$response->status().'): '.$response->body());
+            // Carry the HTTP status as the exception code so the outbox can tell
+            // a permanent rejection (4xx) from a transient failure (5xx/network).
+            throw new RuntimeException(
+                'Auto-mapping ingest gagal ('.$response->status().'): '.$response->body(),
+                $response->status(),
+            );
         }
 
         return $response->json() ?? [];
