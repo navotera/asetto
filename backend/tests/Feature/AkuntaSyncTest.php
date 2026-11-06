@@ -75,6 +75,17 @@ it('does not emit an event whose sync is disabled', function () {
     expect(JournalOutbox::query()->where('source', 'acquisition')->count())->toBe(0);
 });
 
+it('does not emit an event for an asset with sync_akunta off', function () {
+    $asset = Asset::query()->where('code', 'AST-0002')->first();
+    $asset->update(['sync_akunta' => false]);
+    $asset->purchase()->create(['amount' => 5_000_000, 'purchase_date' => '2026-10-01', 'vendor' => 'PT X']);
+
+    $out = app(AkuntaPostingService::class)->postAcquisition($asset->fresh(['purchase', 'category']));
+
+    expect($out)->toBeNull();
+    expect(JournalOutbox::query()->where('source', 'acquisition')->count())->toBe(0);
+});
+
 it('returns the per-asset journal log', function () {
     $asset = Asset::query()->where('code', 'AST-0001')->first();
     makeOutbox(['source_ref' => $asset->id, 'source' => 'disposal', 'source_type' => 'asetto.disposal']);

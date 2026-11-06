@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Button, Field, Input, DateInput, NumberInput, Select, Textarea, Spinner } from '@/components/ui/primitives';
+import { Button, Field, Input, DateInput, NumberInput, Select, Textarea, Spinner, Toggle } from '@/components/ui/primitives';
 import { useCategories, useCustodians, useEntities, useSaveAsset } from '@/api/queries';
 import { useToast } from '@/components/ui/toast';
 import type { Asset, DepreciationMethod } from '@/api/types';
@@ -24,6 +24,7 @@ type FormState = {
   location: string;
   serial_number: string;
   notes: string;
+  sync_akunta: boolean;
 };
 
 function toForm(asset?: Asset | null): FormState {
@@ -40,6 +41,7 @@ function toForm(asset?: Asset | null): FormState {
     location: asset?.location ?? '',
     serial_number: asset?.serial_number ?? '',
     notes: asset?.notes ?? '',
+    sync_akunta: asset?.sync_akunta ?? true,
   };
 }
 
@@ -93,6 +95,7 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
         location: form.location || '—',
         serial_number: form.serial_number || undefined,
         notes: form.notes || undefined,
+        sync_akunta: form.sync_akunta,
       });
       toast('success', asset ? 'Aset diperbarui.' : 'Aset ditambahkan.');
       onClose();
@@ -185,6 +188,17 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
           <Field label="Catatan">
             <Textarea value={form.notes} onChange={set('notes')} />
           </Field>
+        </div>
+        <div className="sm:col-span-2 flex items-center justify-between gap-4 rounded-lg border border-border-soft px-3 py-2.5">
+          <div>
+            <span className="block text-xs font-semibold text-text-default">Sinkronisasi ke Akunta</span>
+            <span className="mt-0.5 block text-xs text-text-muted">Kirim event ekonomi aset ini ke antrian Akunta.</span>
+          </div>
+          <Toggle
+            checked={form.sync_akunta}
+            onChange={(v) => setForm((f) => ({ ...f, sync_akunta: v }))}
+            label="Sinkronisasi ke Akunta"
+          />
         </div>
       </div>
     </Modal>

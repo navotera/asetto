@@ -94,6 +94,8 @@ export interface Asset {
   serial_number?: string;
   notes?: string;
   status: AssetStatus;
+  /** Whether this asset's economic events are synced to the Akunta queue. */
+  sync_akunta: boolean;
   /** True when the asset is soft-deleted (shown in the "Trashed" tab). */
   trashed?: boolean;
   /** Derived, kept denormalised for list views. */

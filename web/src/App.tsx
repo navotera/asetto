@@ -6,6 +6,7 @@ import { useCan } from './api/queries';
 import DashboardPage from './pages/DashboardPage';
 import MyAssetsPage from './pages/MyAssetsPage';
 import AssetsPage from './pages/AssetsPage';
+import AssetCreatePage from './pages/AssetCreatePage';
 import AssetDetailPage from './pages/AssetDetailPage';
 import CategoriesPage from './pages/CategoriesPage';
 import DepreciationPage from './pages/DepreciationPage';
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/aset-saya" element={<MyAssetsPage />} />
           <Route path="/aset" element={<AssetsPage />} />
+          <Route path="/aset/baru" element={<AssetCreatePage />} />
           <Route path="/aset/:id" element={<AssetDetailPage />} />
           <Route path="/kategori" element={<CategoriesPage />} />
           <Route path="/depresiasi" element={<DepreciationPage />} />

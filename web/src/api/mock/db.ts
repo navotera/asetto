@@ -87,12 +87,13 @@ const custodians: Custodian[] = [
 ];
 
 function seedAsset(
-  partial: Omit<Asset, 'accumulated_depreciation' | 'book_value' | 'status' | 'last_depreciated_period' | 'entity_id'> &
-    Partial<Pick<Asset, 'accumulated_depreciation' | 'last_depreciated_period' | 'entity_id'>>,
+  partial: Omit<Asset, 'accumulated_depreciation' | 'book_value' | 'status' | 'last_depreciated_period' | 'entity_id' | 'sync_akunta'> &
+    Partial<Pick<Asset, 'accumulated_depreciation' | 'last_depreciated_period' | 'entity_id' | 'sync_akunta'>>,
 ): Asset {
   const accumulated = partial.accumulated_depreciation ?? 0;
   return {
     status: 'active',
+    sync_akunta: true,
     last_depreciated_period: null,
     entity_id: entities[0].id,
     ...partial,
@@ -820,6 +821,7 @@ export const db = {
       location: input.location || '—',
       serial_number: input.serial_number,
       notes: input.notes,
+      sync_akunta: input.sync_akunta ?? true,
     });
     assets.push(asset);
     auditPush(asset.id, 'created', 'Aset dibuat.');

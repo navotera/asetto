@@ -1,46 +1,10 @@
 import { useState } from 'react';
 import { useEntities, useSetEntityEnabled, useSetDefaultEntity } from '@/api/queries';
 import { useActiveEntity } from '@/hooks/useActiveEntity';
-import { Card, CardHeader, Button, LoadingBlock, EmptyState } from '@/components/ui/primitives';
+import { Card, CardHeader, Button, LoadingBlock, EmptyState, Toggle } from '@/components/ui/primitives';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/toast';
 import { EntityFormModal } from '@/pages/EntityFormModal';
-import { cn } from '@/lib/cn';
-
-/** Small on/off switch. */
-function Toggle({
-  checked,
-  onChange,
-  disabled,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-primary' : 'bg-border-default',
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
-          checked ? 'translate-x-4' : 'translate-x-0.5',
-        )}
-      />
-    </button>
-  );
-}
 
 /**
  * Entity (company/PT) management — the Asetto counterpart of Akunta's workspace

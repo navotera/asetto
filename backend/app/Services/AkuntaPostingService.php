@@ -42,7 +42,7 @@ class AkuntaPostingService
      */
     public function postAcquisition(Asset $asset): ?JournalOutbox
     {
-        if (! $this->settings->syncEnabled('acquisition')) {
+        if (! $this->settings->syncEnabled('acquisition') || ! $asset->sync_akunta) {
             return null;
         }
         $purchase = $asset->purchase;
@@ -97,7 +97,7 @@ class AkuntaPostingService
         foreach ($run->lines as $line) {
             $asset = Asset::query()->with('category')->find($line->asset_id);
             $category = $asset?->category;
-            if (! $asset || ! $asset->entity_id || ! $category instanceof AssetCategory) {
+            if (! $asset || ! $asset->entity_id || ! $asset->sync_akunta || ! $category instanceof AssetCategory) {
                 continue;
             }
             $key = $asset->entity_id.'|'.$category->id;
@@ -145,7 +145,7 @@ class AkuntaPostingService
      */
     public function postDisposal(Disposal $disposal, Asset $asset): ?JournalOutbox
     {
-        if (! $this->settings->syncEnabled('disposal')) {
+        if (! $this->settings->syncEnabled('disposal') || ! $asset->sync_akunta) {
             return null;
         }
         if (! $asset->entity_id) {

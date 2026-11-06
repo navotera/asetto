@@ -160,6 +160,7 @@ class AssetController extends Controller
         $data['category_id'] ??= AssetCategory::query()->value('id');
         $data['status'] = 'active';
         $data['accumulated_depreciation'] = 0;
+        $data['sync_akunta'] ??= true;
 
         $asset = Asset::query()->create($data);
         AssetAudit::log($asset->id, 'created', 'Aset dibuat.');
@@ -324,6 +325,7 @@ class AssetController extends Controller
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'serial_number' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            'sync_akunta' => ['sometimes', 'boolean'],
         ]);
     }
 

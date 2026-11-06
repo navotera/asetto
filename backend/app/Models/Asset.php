@@ -33,6 +33,7 @@ class Asset extends Model
         'salvage_value' => 'decimal:2',
         'useful_life_months' => 'integer',
         'accumulated_depreciation' => 'decimal:2',
+        'sync_akunta' => 'boolean',
     ];
 
     public function category(): BelongsTo

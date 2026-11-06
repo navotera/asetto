@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useAssetsPaged,
   fetchAssetsFiltered,
@@ -17,7 +17,6 @@ import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { KebabMenu, type KebabItem } from '@/components/ui/KebabMenu';
 import { useToast } from '@/components/ui/toast';
 import { formatIDR, formatDate, formatAge } from '@/lib/format';
-import { AssetFormModal } from './AssetFormModal';
 import type { AssetCondition } from '@/api/types';
 
 // xlsx is heavy (~400 kB) and only needed when exporting/importing — load it on demand.
@@ -49,6 +48,7 @@ export default function AssetsPage() {
   const { data: entities } = useEntities();
   const { can } = useCan();
   const { activeEntityId } = useActiveEntity();
+  const navigate = useNavigate();
   const toast = useToast();
   const restore = useRestoreAsset();
   const showValues = can('asset.view_value');
@@ -61,7 +61,6 @@ export default function AssetsPage() {
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') ?? '');
   const [conditionFilter, setConditionFilter] = useState('');
   const [custodianFilter, setCustodianFilter] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('code');
@@ -154,7 +153,7 @@ export default function AssetsPage() {
   }
 
   const actionItems: KebabItem[] = [
-    ...(canManage ? [{ label: '+ Tambah Aset', onClick: () => setModalOpen(true) }] : []),
+    ...(canManage ? [{ label: '+ Tambah Aset', onClick: () => navigate('/aset/baru') }] : []),
     { label: 'Ekspor', onClick: handleExport },
     ...(canManage ? [{ label: 'Impor', onClick: () => setImportOpen(true) }] : []),
   ];
@@ -363,7 +362,6 @@ export default function AssetsPage() {
         )}
       </Card>
 
-      <AssetFormModal open={modalOpen} onClose={() => setModalOpen(false)} asset={null} />
       {importOpen && (
         <Suspense fallback={null}>
           <ImportAssetsModal open={importOpen} onClose={() => setImportOpen(false)} />
