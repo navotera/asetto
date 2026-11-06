@@ -108,6 +108,9 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::post('entities', [EntityController::class, 'store']);
         Route::patch('entities/{entity}', [EntityController::class, 'setEnabled']);
         Route::post('entities/{entity}/default', [EntityController::class, 'setDefault']);
+        Route::get('entities/{entity}/users', [EntityController::class, 'users']);
+        Route::post('entities/{entity}/users', [EntityController::class, 'assignUser']);
+        Route::delete('entities/{entity}/users/{user}', [EntityController::class, 'unassignUser']);
 
         Route::get('role-management', [RoleManagementController::class, 'index']);
         Route::post('role-management/assign', [RoleManagementController::class, 'assign']);

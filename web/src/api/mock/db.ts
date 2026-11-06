@@ -56,6 +56,27 @@ const entities: Entity[] = [
   { id: 'ent_mitra_sejahtera', name: 'PT Mitra Sejahtera', enabled: true, is_default: false },
 ];
 
+// Synced (Ecopa-assigned) members available to assign to entities + the roles
+// an admin may grant per entity (everything below admin).
+const syncedMembers = [
+  { user_id: 'usr_1', name: 'Dede Nugroho', email: 'dede.nugroho@leconfe.com' },
+  { user_id: 'usr_2', name: 'Budi Santoso', email: 'budi@example.com' },
+  { user_id: 'usr_3', name: 'Sari Wijaya', email: 'sari@example.com' },
+  { user_id: 'usr_4', name: 'Andi Pratama', email: 'andi@example.com' },
+];
+const entityRolesList = [
+  { id: 'role_operator', code: 'operator', name: 'Operator' },
+  { id: 'role_mgr', code: 'asset_manager', name: 'Asset Manager' },
+  { id: 'role_user', code: 'asset_user', name: 'User' },
+];
+// entityId -> assignments
+const entityUsers: Record<string, { assignment_id: string; user_id: string; role_id: string }[]> = {
+  ent_asetto_nusantara: [{ assignment_id: 'ea1', user_id: 'usr_2', role_id: 'role_operator' }],
+  ent_mitra_sejahtera: [],
+};
+const entitiesWithCounts = () =>
+  entities.map((e) => ({ ...e, user_count: (entityUsers[e.id] ?? []).length }));
+
 /** Readable, unique entity id derived from the name — mirrors the backend. */
 function entitySlugId(name: string): string {
   const base = name
@@ -682,12 +703,46 @@ export const db = {
   me: () => me,
   categories: () => categories.map((c) => ({ ...c, asset_count: assets.filter((a) => a.category_id === c.id).length })),
   custodians: () => custodians,
-  entities: () => entities,
+  entities: () => entitiesWithCounts(),
   createEntity(input: { name?: string }): Entity {
     const name = input.name?.trim() || 'Entitas Baru';
     const e: Entity = { id: entitySlugId(name), name, enabled: true, is_default: false };
     entities.push(e);
+    entityUsers[e.id] = [];
     return e;
+  },
+
+  entityUsersList(entityId: string) {
+    const assigned = (entityUsers[entityId] ?? []).map((a) => {
+      const m = syncedMembers.find((s) => s.user_id === a.user_id);
+      const r = entityRolesList.find((x) => x.id === a.role_id);
+      return {
+        assignment_id: a.assignment_id,
+        user_id: a.user_id,
+        name: m?.name ?? a.user_id,
+        email: m?.email ?? null,
+        role_id: a.role_id,
+        role_code: r?.code ?? null,
+        role_name: r?.name ?? null,
+        disabled_at: null,
+      };
+    });
+    const assignedIds = new Set(assigned.map((a) => a.user_id));
+    const assignable = syncedMembers
+      .filter((s) => !assignedIds.has(s.user_id))
+      .map((s) => ({ user_id: s.user_id, name: s.name, email: s.email }));
+    return { assigned, assignable, roles: entityRolesList };
+  },
+  assignEntityUser(entityId: string, userId: string, roleId: string) {
+    entityUsers[entityId] ??= [];
+    const existing = entityUsers[entityId].find((a) => a.user_id === userId);
+    if (existing) existing.role_id = roleId;
+    else entityUsers[entityId].push({ assignment_id: id('ea'), user_id: userId, role_id: roleId });
+    return db.entityUsersList(entityId);
+  },
+  unassignEntityUser(entityId: string, userId: string) {
+    entityUsers[entityId] = (entityUsers[entityId] ?? []).filter((a) => a.user_id !== userId);
+    return db.entityUsersList(entityId);
   },
 
   setEntityEnabled(entityId: string, enabled: boolean): Entity[] {
@@ -707,7 +762,7 @@ export const db = {
     } else {
       e.enabled = true;
     }
-    return entities;
+    return entitiesWithCounts();
   },
 
   setDefaultEntity(entityId: string): Entity[] {
@@ -716,7 +771,7 @@ export const db = {
     entities.forEach((x) => (x.is_default = false));
     e.is_default = true;
     e.enabled = true;
-    return entities;
+    return entitiesWithCounts();
   },
 
   createCategory(input: Partial<AssetCategory>): AssetCategory {
@@ -1114,6 +1169,7 @@ export const db = {
     unassigned_users: [],
     roles: [
       { id: 'role_admin', code: 'admin', name: 'Admin' },
+      { id: 'role_operator', code: 'operator', name: 'Operator' },
       { id: 'role_mgr', code: 'asset_manager', name: 'Asset Manager' },
       { id: 'role_user', code: 'asset_user', name: 'User' },
     ],

@@ -30,6 +30,12 @@ return [
             'name' => 'Admin',
             'permissions' => '*',
         ],
+        // Default role for a newly Ecopa-assigned (non-admin) user: full asset
+        // operations, no settings/role management.
+        'operator' => [
+            'name' => 'Operator',
+            'permissions' => ['asset.read', 'asset.read_own', 'asset.view_value', 'asset.manage', 'disposal.manage', 'depreciation.run', 'journal.read'],
+        ],
         'asset_manager' => [
             'name' => 'Asset Manager',
             'permissions' => ['asset.read', 'asset.view_value', 'asset.manage', 'disposal.manage', 'depreciation.run', 'journal.read'],
@@ -43,7 +49,11 @@ return [
     // Role seniority for impersonation / self-protection guards (higher = more senior).
     'ranks' => [
         'admin' => 100,
+        'operator' => 60,
         'asset_manager' => 50,
         'asset_user' => 10,
     ],
+
+    // The role code auto-assigned to a non-admin user when Ecopa assigns them.
+    'default_role' => 'operator',
 ];

@@ -17,6 +17,7 @@ import type {
   Disposal,
   DisposalType,
   Entity,
+  EntityUsersData,
   JournalEntry,
   Me,
   MyAsset,
@@ -239,6 +240,36 @@ export function useSetDefaultEntity() {
   return useMutation({
     mutationFn: (id: string) => api.post<Entity[]>(`/entities/${id}/default`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.entities }),
+  });
+}
+
+export const useEntityUsers = (entityId: string | null) =>
+  useQuery({
+    queryKey: ['entities', entityId, 'users'] as const,
+    queryFn: () => api.get<EntityUsersData>(`/entities/${entityId}/users`),
+    enabled: !!entityId,
+  });
+
+export function useAssignEntityUser(entityId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { user_id: string; role_id: string }) =>
+      api.post<EntityUsersData>(`/entities/${entityId}/users`, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['entities', entityId, 'users'] });
+      qc.invalidateQueries({ queryKey: keys.entities });
+    },
+  });
+}
+
+export function useUnassignEntityUser(entityId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.del(`/entities/${entityId}/users/${userId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['entities', entityId, 'users'] });
+      qc.invalidateQueries({ queryKey: keys.entities });
+    },
   });
 }
 

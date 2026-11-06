@@ -44,6 +44,22 @@ function assignRole(User $u, string $roleCode): UserAppAssignment
     ]);
 }
 
+/** Grant a non-admin user access to a specific entity (entity-scoped assignment). */
+function assignEntity(User $u, string $entityId, string $roleCode): UserAppAssignment
+{
+    $app = RbacApp::query()->where('code', 'asetto')->first();
+    $role = Role::query()->whereNull('tenant_id')->where('code', $roleCode)->first();
+
+    return UserAppAssignment::query()->create([
+        'id' => (string) Str::ulid(),
+        'user_id' => $u->id,
+        'app_id' => $app->id,
+        'entity_id' => $entityId,
+        'role_id' => $role->id,
+        'assigned_at' => now(),
+    ]);
+}
+
 /** actingAs as a non-admin role (session app_role=user so isSsoAdmin is false). */
 function actingAsRole($test, string $roleCode): User
 {
@@ -65,15 +81,26 @@ it('me exposes all permissions for an Ecopa admin', function () {
         ->assertJsonCount(8, 'permissions');
 });
 
-it('asset manager can list assets with values and create assets', function () {
-    actingAsRole($this, 'asset_manager');
+it('asset manager can list assets with values and create assets in assigned entities', function () {
+    $u = actingAsRole($this, 'asset_manager');
+    $entityId = \Akunta\Rbac\Models\Entity::query()->value('id');
+    // Must be granted the entity to see/create its assets (no automatic all-entity access).
+    assignEntity($u, $entityId, 'asset_manager');
 
     $this->getJson('/api/assets')->assertOk()->assertJsonPath('0.values_hidden', false);
     $this->getJson('/api/me')->assertJsonPath('role', 'Asset Manager');
     $this->postJson('/api/assets', [
-        'name' => 'X', 'entity_id' => \Akunta\Rbac\Models\Entity::query()->value('id'),
+        'name' => 'X', 'entity_id' => $entityId,
         'category_id' => 'cat_komputer', 'acquisition_date' => '2026-01-01', 'acquisition_cost' => 1000,
     ])->assertCreated();
+});
+
+it('a non-admin without an entity grant sees an empty asset list', function () {
+    actingAsRole($this, 'asset_manager'); // membership role only, no entity assignment
+
+    $this->getJson('/api/assets?page=1&per_page=25')
+        ->assertOk()
+        ->assertJsonPath('total', 0);
 });
 
 it('plain user is blocked from the asset list and management but can see Aset Saya without values', function () {
@@ -97,18 +124,21 @@ it('plain user is blocked from the asset list and management but can see Aset Sa
         ->assertJsonMissingPath('0.acquisition_cost');
 });
 
-it('admin assigns a role via email (provisional user) and lists role management', function () {
-    $u = makeUser();
-    $this->withSession(['ecopa.app_role' => 'admin'])->actingAs($u);
+it('admin assigns a role to a synced user; email provisioning is gone', function () {
+    $admin = makeUser();
+    $this->withSession(['ecopa.app_role' => 'admin'])->actingAs($admin);
 
+    $synced = makeUser(); // an already Ecopa-synced user
     $managerRole = Role::query()->whereNull('tenant_id')->where('code', 'asset_manager')->first();
 
-    $this->postJson('/api/role-management/assign', ['email' => 'baru@example.com', 'role_id' => $managerRole->id])
+    $this->postJson('/api/role-management/assign', ['user_id' => $synced->id, 'role_id' => $managerRole->id])
         ->assertOk();
+    expect($synced->fresh()->localRoleCode())->toBe('asset_manager');
 
-    $created = User::query()->where('email', 'baru@example.com')->first();
-    expect($created)->not->toBeNull()
-        ->and($created->localRoleCode())->toBe('asset_manager');
+    // The email path no longer provisions a brand-new user.
+    $this->postJson('/api/role-management/assign', ['email' => 'baru@example.com', 'role_id' => $managerRole->id])
+        ->assertStatus(422);
+    expect(User::query()->where('email', 'baru@example.com')->exists())->toBeFalse();
 
     $this->getJson('/api/role-management')->assertOk()->assertJsonStructure(['users', 'unassigned_users', 'roles']);
 });

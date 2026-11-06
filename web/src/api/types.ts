@@ -64,6 +64,32 @@ export interface Entity {
   enabled: boolean;
   /** The entity selected by default when none is remembered. */
   is_default: boolean;
+  /** Number of users assigned to this entity (settings list). */
+  user_count?: number;
+}
+
+/** A user assigned to a specific entity. */
+export interface EntityUser {
+  assignment_id: string;
+  user_id: string;
+  name: string | null;
+  email: string | null;
+  role_id: string | null;
+  role_code: string | null;
+  role_name: string | null;
+  disabled_at: string | null;
+}
+
+export interface AssignableUser {
+  user_id: string;
+  name: string | null;
+  email: string | null;
+}
+
+export interface EntityUsersData {
+  assigned: EntityUser[];
+  assignable: AssignableUser[];
+  roles: { id: string; code: string; name: string }[];
 }
 
 export interface Custodian {

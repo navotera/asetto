@@ -41,6 +41,9 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if (m === 'GET' && path === '/entities') return db.entities();
   if (m === 'POST' && path === '/entities') return db.createEntity(body);
   if ((p = match(path, '/entities/:id/default')) && m === 'POST') return db.setDefaultEntity(p.id);
+  if ((p = match(path, '/entities/:id/users/:uid')) && m === 'DELETE') return db.unassignEntityUser(p.id, p.uid);
+  if ((p = match(path, '/entities/:id/users')) && m === 'GET') return db.entityUsersList(p.id);
+  if ((p = match(path, '/entities/:id/users')) && m === 'POST') return db.assignEntityUser(p.id, body.user_id, body.role_id);
   if ((p = match(path, '/entities/:id')) && m === 'PATCH') return db.setEntityEnabled(p.id, !!body.enabled);
 
   if (m === 'GET' && path === '/assets') return db.listAssets(query);

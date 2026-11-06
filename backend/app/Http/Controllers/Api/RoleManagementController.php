@@ -76,13 +76,12 @@ class RoleManagementController extends Controller
         $data = $request->validate([
             'user_id' => ['nullable', 'string'],
             'ecopa_user_id' => ['nullable', 'string'],
-            'email' => ['nullable', 'email'],
             'role_id' => ['required', 'string', Rule::in($this->assignableRoles()->pluck('id'))],
         ]);
 
         $user = $this->resolveUser($data);
         if (! $user) {
-            return response()->json(['message' => 'User tidak ditemukan. Sediakan user_id, ecopa_user_id, atau email.'], 422);
+            return response()->json(['message' => 'User tidak ditemukan. Sediakan user_id atau ecopa_user_id dari pengguna yang sudah di-assign Ecopa.'], 422);
         }
 
         $app = $this->app();
@@ -185,7 +184,12 @@ class RoleManagementController extends Controller
         return Role::query()->whereNull('tenant_id')->whereIn('code', $codes)->get();
     }
 
-    /** @param array<string, mixed> $data */
+    /**
+     * Resolve the target user. Only users already synced from Ecopa can be
+     * assigned a role — there is no provision-by-email path.
+     *
+     * @param array<string, mixed> $data
+     */
     private function resolveUser(array $data): ?User
     {
         if (! empty($data['user_id'])) {
@@ -193,14 +197,6 @@ class RoleManagementController extends Controller
         }
         if (! empty($data['ecopa_user_id'])) {
             return User::query()->where('main_tier_user_id', $data['ecopa_user_id'])->first();
-        }
-        if (! empty($data['email'])) {
-            // Fallback: provision a pending user keyed on email; links to its Ecopa
-            // UUID automatically when the user is first synced/logs in.
-            return User::query()->firstOrCreate(
-                ['email' => $data['email']],
-                ['id' => (string) Str::ulid(), 'name' => Str::before($data['email'], '@')],
-            );
         }
 
         return null;

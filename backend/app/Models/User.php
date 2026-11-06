@@ -24,31 +24,41 @@ class User extends RbacUser
 {
     use HasApiTokens;
 
-    /** Entities this user may act within (RBAC-scoped, like Akunta). */
+    /** Entities this user may act within. Admins = all; others = entities an
+     *  admin explicitly assigned them to (per-entity assignments). A plain
+     *  membership (entity_id null) grants NO entity access on its own. */
     public function getTenants(): Collection
     {
-        if ($this->isSsoAdmin()) {
+        if ($this->isAssettoAdmin()) {
             return Entity::query()->get();
         }
 
-        return Entity::query()
-            ->whereIn('id', $this->assignments()->whereNull('revoked_at')->pluck('entity_id')->filter()->unique()->values())
-            ->orWhereIn('id', $this->accessibleEntityIdsFromTenantWide())
-            ->get();
+        return Entity::query()->whereIn('id', $this->accessibleEntityIds())->get();
     }
 
     public function canAccessTenant(Entity $entity): bool
     {
-        if ($this->isSsoAdmin()) {
+        if ($this->isAssettoAdmin()) {
             return true;
         }
 
+        return $this->accessibleEntityIds()->contains($entity->id);
+    }
+
+    /**
+     * Entity ids a non-admin user may access — taken only from entity-scoped
+     * assignments (entity_id set). Admins are not entity-scoped (see getTenants).
+     *
+     * @return Collection<int, string>
+     */
+    public function accessibleEntityIds(): Collection
+    {
         return $this->assignments()
             ->whereNull('revoked_at')
-            ->where(function ($q) use ($entity) {
-                $q->whereNull('entity_id')->orWhere('entity_id', $entity->id);
-            })
-            ->exists();
+            ->whereNotNull('entity_id')
+            ->pluck('entity_id')
+            ->unique()
+            ->values();
     }
 
     /** True if the current session was provisioned via Ecopa with app_role=admin. */
@@ -118,14 +128,5 @@ class User extends RbacUser
             ->unique()
             ->values()
             ->all();
-    }
-
-    protected function accessibleEntityIdsFromTenantWide(): Collection
-    {
-        if ($this->assignments()->whereNull('revoked_at')->whereNull('entity_id')->exists()) {
-            return Entity::query()->pluck('id');
-        }
-
-        return collect();
     }
 }

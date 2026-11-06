@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Webhooks;
 
 use Akunta\Rbac\Models\App as RbacApp;
 use Akunta\Rbac\Models\Entity;
+use Akunta\Rbac\Models\Role;
 use Akunta\Rbac\Models\Tenant;
 use App\Exceptions\EcopaRegistrationException;
 use App\Http\Controllers\Controller;
@@ -170,10 +171,23 @@ class EcopaWebhookController extends Controller
         $ecopaRole = $subject['ecopa_role'] ?? $subject['app_role'] ?? null;
         $assignment->ecopa_role = is_string($ecopaRole) ? $ecopaRole : $assignment->ecopa_role;
         $assignment->revoked_at = null;
-        // role_id (detailed Asetto role) is intentionally left for a local admin to choose.
+        // Default the local role on first assignment: admins get the admin role,
+        // everyone else the configured default (operator). A local admin's later
+        // manual role change is preserved (only set when still unassigned).
+        if ($assignment->role_id === null) {
+            $assignment->role_id = $this->defaultRoleId($assignment->ecopa_role);
+        }
         $assignment->save();
 
         return ['status' => 'applied', 'code' => 'user_access_assigned'];
+    }
+
+    /** Role id to default a new assignment to: admin for admins, else operator. */
+    private function defaultRoleId(?string $ecopaRole): ?string
+    {
+        $code = $ecopaRole === 'admin' ? 'admin' : (string) config('asetto_permissions.default_role', 'operator');
+
+        return Role::query()->whereNull('tenant_id')->where('code', $code)->value('id');
     }
 
     private function onUserUpdated(array $subject): array

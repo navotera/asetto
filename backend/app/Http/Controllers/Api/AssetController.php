@@ -11,6 +11,7 @@ use App\Models\AssetCategory;
 use App\Models\Custodian;
 use App\Models\CustodyHandover;
 use App\Models\JournalOutbox;
+use App\Models\User;
 use App\Support\AssetAudit;
 use App\Support\Present;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +42,13 @@ class AssetController extends Controller
             ->leftJoin('asset_categories', 'assets.category_id', '=', 'asset_categories.id')
             ->leftJoin('custodians', 'assets.custodian_id', '=', 'custodians.id')
             ->select('assets.*');
+
+        // Entity scoping: non-admins only see assets of entities assigned to them.
+        /** @var User $user */
+        $user = $request->user();
+        if (! $user->isAssettoAdmin()) {
+            $query->whereIn('assets.entity_id', $user->accessibleEntityIds());
+        }
 
         // Filters.
         $search = trim((string) $request->query('search', ''));
@@ -121,9 +129,22 @@ class AssetController extends Controller
 
     public function show(Request $request, Asset $asset): JsonResponse
     {
+        $this->authorizeEntity($asset);
         $withValues = (bool) $request->user()?->hasPermission('asset.view_value');
 
         return response()->json(Present::asset($asset, $withValues));
+    }
+
+    /** Non-admins may only touch assets of entities assigned to them. */
+    private function authorizeEntity(Asset $asset): void
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+        abort_unless(
+            $user && ($user->isAssettoAdmin() || $user->accessibleEntityIds()->contains($asset->entity_id)),
+            403,
+            'Tidak memiliki akses ke entitas aset ini.',
+        );
     }
 
     /** Assets delegated to the current user (custodian linked to them), without values. */
@@ -156,6 +177,12 @@ class AssetController extends Controller
     {
         $data = $this->validatePayload($request, creating: true);
 
+        /** @var User|null $user */
+        $user = $request->user();
+        if ($user && ! $user->isAssettoAdmin() && ! $user->accessibleEntityIds()->contains($data['entity_id'])) {
+            abort(403, 'Tidak memiliki akses ke entitas ini.');
+        }
+
         $data['code'] ??= $this->nextCode();
         $data['category_id'] ??= AssetCategory::query()->value('id');
         $data['status'] = 'active';
@@ -170,6 +197,7 @@ class AssetController extends Controller
 
     public function update(Request $request, Asset $asset): JsonResponse
     {
+        $this->authorizeEntity($asset);
         $data = $this->validatePayload($request, creating: false);
         $asset->fill($data)->save();
         AssetAudit::log($asset->id, 'updated', 'Data aset diperbarui.');
@@ -179,6 +207,7 @@ class AssetController extends Controller
 
     public function destroy(Asset $asset): JsonResponse
     {
+        $this->authorizeEntity($asset);
         if ((float) $asset->accumulated_depreciation > 0) {
             return response()->json([
                 'message' => 'Aset sudah terdepresiasi — gunakan pelepasan, bukan hapus.',
@@ -194,6 +223,7 @@ class AssetController extends Controller
     /** Restore a soft-deleted (trashed) asset back to its tab. */
     public function restore(Asset $asset): JsonResponse
     {
+        $this->authorizeEntity($asset);
         $asset->restore();
         AssetAudit::log($asset->id, 'restored', 'Aset dipulihkan dari sampah.');
 
@@ -202,6 +232,7 @@ class AssetController extends Controller
 
     public function setCondition(Request $request, Asset $asset): JsonResponse
     {
+        $this->authorizeEntity($asset);
         $data = $request->validate([
             'condition' => ['required', Rule::in(self::CONDITIONS)],
         ]);
@@ -215,6 +246,7 @@ class AssetController extends Controller
 
     public function reassign(Request $request, Asset $asset): JsonResponse
     {
+        $this->authorizeEntity($asset);
         $data = $request->validate([
             'custodian_id' => ['nullable', 'string', 'exists:custodians,id'],
             'location' => ['nullable', 'string', 'max:255'],

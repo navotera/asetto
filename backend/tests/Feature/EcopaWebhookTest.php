@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 use App\Models\EcopaWebhookReceipt;
 use App\Models\User;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
+
+// Roles must exist so webhook-provisioned users get their default local role.
+beforeEach(fn () => test()->seed(RolesSeeder::class));
 
 /** Permanent lifecycle webhook secret (64 hex chars, as Ecopa issues). */
 const WEBHOOK_SECRET = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
@@ -59,6 +63,21 @@ it('provisions a shadow user + assignment on user.assigned', function () {
     expect($user)->not->toBeNull()
         ->and($user->email)->toBe('budi@example.com')
         ->and($user->assignments()->whereNull('revoked_at')->count())->toBe(1);
+
+    // Non-admin users default to the operator role; it grants no entity access yet.
+    expect($user->assignments()->first()->role?->code)->toBe('operator');
+    expect($user->accessibleEntityIds()->all())->toBe([]);
+});
+
+it('defaults an admin assignment to the admin role', function () {
+    signedWebhook([
+        'event' => 'user.assigned',
+        'event_id' => 'evt-assign-admin',
+        'subject' => ['user_id' => 'ec-adm2', 'email' => 'adm2@example.com', 'name' => 'Adm2', 'app_role' => 'admin'],
+    ])->assertOk();
+
+    $user = User::query()->where('main_tier_user_id', 'ec-adm2')->first();
+    expect($user->assignments()->first()->role?->code)->toBe('admin');
 });
 
 it('is idempotent — a replayed event_id is not processed twice', function () {

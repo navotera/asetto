@@ -5,7 +5,7 @@ import {
   useUpdateAssignment,
   useImpersonate,
 } from '@/api/queries';
-import { Card, CardHeader, Button, Select, Input, Badge, LoadingBlock, Spinner } from '@/components/ui/primitives';
+import { Card, CardHeader, Button, Select, Badge, LoadingBlock } from '@/components/ui/primitives';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/toast';
 
@@ -18,8 +18,6 @@ export function UserRolesPanel() {
 
   const [tab, setTab] = useState<'assigned' | 'available'>('assigned');
   const [availableRole, setAvailableRole] = useState<Record<string, string>>({});
-  const [email, setEmail] = useState('');
-  const [emailRole, setEmailRole] = useState('');
 
   const roles = data?.roles ?? [];
 
@@ -42,18 +40,6 @@ export function UserRolesPanel() {
     }
   }
 
-  async function assignViaEmail() {
-    if (!email || !emailRole) return;
-    try {
-      await assign.mutateAsync({ email, role_id: emailRole });
-      toast('success', `Role di-assign ke ${email}.`);
-      setEmail('');
-      setEmailRole('');
-    } catch (e) {
-      toast('error', e instanceof Error ? e.message : 'Gagal assign via email.');
-    }
-  }
-
   async function doImpersonate(assignmentId: string) {
     try {
       await impersonate.mutateAsync(assignmentId);
@@ -72,7 +58,7 @@ export function UserRolesPanel() {
     <Card className="lg:col-span-2">
       <CardHeader
         title="User & Roles"
-        subtitle="Identitas user dari Ecopa; role Asetto ditentukan admin. Email hanya jalur opsional."
+        subtitle="Identitas user dari Ecopa; role Asetto ditentukan admin. Hanya user yang sudah di-assign Ecopa yang tampil di sini."
       />
 
       <div className="flex gap-1 border-b border-border-soft px-5 pt-3">
@@ -182,20 +168,6 @@ export function UserRolesPanel() {
           </tbody>
         </Table>
       )}
-
-      <div className="flex flex-col gap-2 border-t border-border-soft px-5 py-4 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <span className="mb-1 block text-xs font-semibold text-text-default">Assign via email (opsional)</span>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@perusahaan.com" />
-        </div>
-        <Select value={emailRole} onChange={(e) => setEmailRole(e.target.value)} className="sm:w-48">
-          <option value="">Pilih role…</option>
-          {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </Select>
-        <Button onClick={assignViaEmail} disabled={!email || !emailRole || assign.isPending}>
-          {assign.isPending && <Spinner />} Assign
-        </Button>
-      </div>
     </Card>
   );
 }
