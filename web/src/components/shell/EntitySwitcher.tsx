@@ -20,8 +20,9 @@ export function EntitySwitcher() {
 
   const canManage = me?.app_role === 'admin' || can('settings.manage');
   const list = entities ?? [];
-  const active = list.find((e) => e.id === activeEntityId) ?? null;
-  const label = active?.name ?? 'Semua Entitas';
+  // Exactly one entity is always active (no "all"); fall back to the first.
+  const active = list.find((e) => e.id === activeEntityId) ?? list[0] ?? null;
+  const label = active?.name ?? 'Entitas';
   const badge = active ? active.name.charAt(0).toUpperCase() : '∗';
 
   useEffect(() => {
@@ -33,10 +34,12 @@ export function EntitySwitcher() {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
-  // If the active entity vanished (deleted elsewhere), fall back to "all".
+  // Always keep exactly one entity active: on first load, or if the active one
+  // was deleted elsewhere, select the first available entity.
   useEffect(() => {
-    if (activeEntityId && entities && !entities.some((e) => e.id === activeEntityId)) {
-      setActiveEntityId(null);
+    if (!entities || entities.length === 0) return;
+    if (!activeEntityId || !entities.some((e) => e.id === activeEntityId)) {
+      setActiveEntityId(entities[0].id);
     }
   }, [activeEntityId, entities, setActiveEntityId]);
 
@@ -67,23 +70,8 @@ export function EntitySwitcher() {
             Pilih Entitas ({list.length})
           </div>
           <ul role="listbox" className="max-h-72 overflow-y-auto py-1">
-            <li>
-              <button
-                onClick={() => pick(null)}
-                role="option"
-                aria-selected={activeEntityId === null}
-                className={cn(
-                  'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-primary-light',
-                  activeEntityId === null ? 'font-semibold text-primary' : 'text-text-default',
-                )}
-              >
-                <span className="flex h-6 w-6 items-center justify-center rounded bg-primary/15 text-xs font-bold text-primary">∗</span>
-                <span className="flex-1">Semua Entitas</span>
-                {activeEntityId === null && <span className="text-primary">✓</span>}
-              </button>
-            </li>
             {list.map((e) => {
-              const selected = e.id === activeEntityId;
+              const selected = e.id === active?.id;
               return (
                 <li key={e.id}>
                   <button
