@@ -51,6 +51,8 @@ export function handle(method: string, rawPath: string, body: any): unknown {
     if (m === 'PATCH') return db.updateAsset(p.id, body);
     if (m === 'DELETE') return db.deleteAsset(p.id) ?? { ok: true };
   }
+  if ((p = match(path, '/assets/:id/restore')) && m === 'POST')
+    return db.restoreAsset(p.id);
   if ((p = match(path, '/assets/:id/condition')) && m === 'POST')
     return db.setCondition(p.id, body.condition);
   if ((p = match(path, '/assets/:id/reassign')) && m === 'POST')

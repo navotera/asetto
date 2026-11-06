@@ -80,6 +80,7 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::post('assets/import', [AssetImportController::class, 'import']);
         Route::patch('assets/{asset}', [AssetController::class, 'update']);
         Route::delete('assets/{asset}', [AssetController::class, 'destroy']);
+        Route::post('assets/{asset}/restore', [AssetController::class, 'restore'])->withTrashed();
         Route::post('assets/{asset}/condition', [AssetController::class, 'setCondition']);
         Route::post('assets/{asset}/reassign', [AssetController::class, 'reassign']);
         Route::post('assets/{asset}/photos', [PhotoController::class, 'store']);

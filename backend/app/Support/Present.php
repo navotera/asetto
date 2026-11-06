@@ -49,6 +49,7 @@ class Present
             'serial_number' => $asset->serial_number,
             'notes' => $asset->notes,
             'status' => $asset->status,
+            'trashed' => $asset->trashed(),
             'accumulated_depreciation' => $withValues ? $accum : null,
             'book_value' => $withValues ? max(0.0, $cost - $accum) : null,
             'last_depreciated_period' => $asset->last_depreciated_period,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Button, Field, Input, NumberInput, Select, Textarea, Spinner } from '@/components/ui/primitives';
+import { Button, Field, Input, DateInput, NumberInput, Select, Textarea, Spinner } from '@/components/ui/primitives';
 import { useCategories, useCustodians, useEntities, useSaveAsset } from '@/api/queries';
 import { useToast } from '@/components/ui/toast';
 import type { Asset, DepreciationMethod } from '@/api/types';
@@ -148,7 +148,7 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
           />
         </Field>
         <Field label="Tanggal Perolehan">
-          <Input type="date" value={form.acquisition_date} onChange={set('acquisition_date')} />
+          <DateInput value={form.acquisition_date} onChange={set('acquisition_date')} />
         </Field>
         <Field label="Masa Manfaat (bulan)" hint="Mengikuti kategori terpilih.">
           <NumberInput

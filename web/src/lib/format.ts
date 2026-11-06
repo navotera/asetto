@@ -60,6 +60,22 @@ export function formatWithPattern(d: Date, fmt: string): string {
   return out;
 }
 
+/** Parse a date-only "YYYY-MM-DD" (or any ISO) string as a LOCAL Date. */
+export function parseLocalDate(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
+}
+
+/**
+ * "YYYY-MM-DD" → the configured date format, parsed in local time.
+ * Empty input → "" (for use inside form controls, unlike formatDate's "—").
+ */
+export function formatISODate(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = parseLocalDate(iso);
+  return Number.isNaN(d.getTime()) ? '' : formatWithPattern(d, dateFormat);
+}
+
 /** ISO date string → formatted per the configured date format (default "d F Y"). */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -74,6 +90,27 @@ export function formatDateTime(iso: string | null | undefined): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   return formatWithPattern(d, dateFormat + ' H:i');
+}
+
+/**
+ * Asset age from an acquisition date to today, in Indonesian:
+ * "3 tahun 2 bulan", "5 bulan", or "Baru" for under a month.
+ */
+export function formatAge(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const start = parseLocalDate(iso);
+  if (Number.isNaN(start.getTime())) return '—';
+  const now = new Date();
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (now.getDate() < start.getDate()) months -= 1;
+  if (months < 0) return '—';
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  if (years === 0 && rem === 0) return 'Baru';
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} tahun`);
+  if (rem > 0) parts.push(`${rem} bulan`);
+  return parts.join(' ');
 }
 
 /** "2026-11" → "November 2026". */

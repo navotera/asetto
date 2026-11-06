@@ -52,7 +52,6 @@ class AssetController extends Controller
         }
         foreach ([
             'category_id' => 'assets.category_id',
-            'status' => 'assets.status',
             'condition' => 'assets.condition',
             'custodian_id' => 'assets.custodian_id',
             'entity_id' => 'assets.entity_id',
@@ -63,12 +62,31 @@ class AssetController extends Controller
             }
         }
 
+        // Tab = active (status active) | inactive (disposed) | trashed (soft-deleted).
+        // Counts are computed against the filtered base (before the tab is applied)
+        // so each tab badge reflects the current search/filters.
+        $tab = (string) $request->query('tab', 'active');
+        $tab = in_array($tab, ['active', 'inactive', 'trashed'], true) ? $tab : 'active';
+        $counts = [
+            'active' => (clone $query)->where('assets.status', 'active')->count('assets.id'),
+            'inactive' => (clone $query)->where('assets.status', 'disposed')->count('assets.id'),
+            'trashed' => (clone $query)->onlyTrashed()->count('assets.id'),
+        ];
+        if ($tab === 'trashed') {
+            $query->onlyTrashed();
+        } elseif ($tab === 'inactive') {
+            $query->where('assets.status', 'disposed');
+        } else {
+            $query->where('assets.status', 'active');
+        }
+
         // Sorting.
         $sortColumns = [
             'code' => 'assets.code',
             'name' => 'assets.name',
             'category' => 'asset_categories.name',
             'custodian' => 'custodians.name',
+            'acquisition_date' => 'assets.acquisition_date',
             'acquisition_cost' => 'assets.acquisition_cost',
             'condition' => 'assets.condition',
             'status' => 'assets.status',
@@ -97,6 +115,7 @@ class AssetController extends Controller
             'per_page' => $p->perPage(),
             'total' => $p->total(),
             'last_page' => $p->lastPage(),
+            'counts' => $counts,
         ]);
     }
 
@@ -166,8 +185,18 @@ class AssetController extends Controller
         }
 
         $asset->delete();
+        AssetAudit::log($asset->id, 'trashed', 'Aset dipindahkan ke sampah.');
 
         return response()->json(['ok' => true]);
+    }
+
+    /** Restore a soft-deleted (trashed) asset back to its tab. */
+    public function restore(Asset $asset): JsonResponse
+    {
+        $asset->restore();
+        AssetAudit::log($asset->id, 'restored', 'Aset dipulihkan dari sampah.');
+
+        return response()->json(Present::asset($asset->refresh()));
     }
 
     public function setCondition(Request $request, Asset $asset): JsonResponse

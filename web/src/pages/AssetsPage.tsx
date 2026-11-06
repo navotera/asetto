@@ -6,16 +6,17 @@ import {
   useCategories,
   useCustodians,
   useEntities,
+  useRestoreAsset,
   useCan,
   type AssetListParams,
 } from '@/api/queries';
 import { useActiveEntity } from '@/hooks/useActiveEntity';
-import { PageHeader, Card, Input, Select, Field, LoadingBlock, EmptyState } from '@/components/ui/primitives';
-import { ConditionBadge, AssetStatusBadge } from '@/components/ui/badges';
+import { PageHeader, Card, Input, Select, Field, LoadingBlock, EmptyState, Button } from '@/components/ui/primitives';
+import { ConditionBadge } from '@/components/ui/badges';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { KebabMenu, type KebabItem } from '@/components/ui/KebabMenu';
 import { useToast } from '@/components/ui/toast';
-import { formatIDR, formatDate } from '@/lib/format';
+import { formatIDR, formatDate, formatAge } from '@/lib/format';
 import { AssetFormModal } from './AssetFormModal';
 import type { AssetCondition } from '@/api/types';
 
@@ -31,16 +32,16 @@ const CONDITIONS: { value: AssetCondition; label: string }[] = [
   { value: 'idle', label: 'Tidak Terpakai' },
 ];
 
-// Only two real choices → radio group instead of a dropdown.
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: '', label: 'Semua status' },
-  { value: 'active', label: 'Aktif' },
-  { value: 'disposed', label: 'Dilepas' },
+type TabKey = 'active' | 'inactive' | 'trashed';
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'active', label: 'Aktif' },
+  { key: 'inactive', label: 'Tidak Aktif' },
+  { key: 'trashed', label: 'Trashed' },
 ];
 
 const PER_PAGE = 25;
 
-type SortKey = 'code' | 'name' | 'category' | 'custodian' | 'acquisition_cost' | 'book_value' | 'condition' | 'status';
+type SortKey = 'code' | 'name' | 'category' | 'acquisition_date' | 'book_value' | 'condition';
 
 export default function AssetsPage() {
   const { data: categories } = useCategories();
@@ -49,14 +50,15 @@ export default function AssetsPage() {
   const { can } = useCan();
   const { activeEntityId } = useActiveEntity();
   const toast = useToast();
+  const restore = useRestoreAsset();
   const showValues = can('asset.view_value');
   const canManage = can('asset.manage');
 
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<TabKey>('active');
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') ?? '');
-  const [statusFilter, setStatusFilter] = useState('');
   const [conditionFilter, setConditionFilter] = useState('');
   const [custodianFilter, setCustodianFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -78,10 +80,10 @@ export default function AssetsPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Any filter/sort/search change returns to the first page.
+  // Any filter/sort/search/tab change returns to the first page.
   useEffect(() => {
     setPage(1);
-  }, [search, categoryFilter, statusFilter, conditionFilter, custodianFilter, activeEntityId, sortKey, sortDir]);
+  }, [search, tab, categoryFilter, conditionFilter, custodianFilter, activeEntityId, sortKey, sortDir]);
 
   // Close the filter popover on outside click or Escape.
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function AssetsPage() {
   const filterParams: AssetListParams = {
     search: search || undefined,
     category_id: categoryFilter || undefined,
-    status: statusFilter || undefined,
+    tab,
     condition: conditionFilter || undefined,
     custodian_id: custodianFilter || undefined,
     entity_id: activeEntityId || undefined,
@@ -113,13 +115,13 @@ export default function AssetsPage() {
 
   const { data, isLoading, isFetching } = useAssetsPaged({ ...filterParams, page, per_page: PER_PAGE });
   const rows = data?.items ?? [];
+  const counts = data?.counts ?? { active: 0, inactive: 0, trashed: 0 };
 
-  const custodianName = (id: string | null) => custodians?.find((c) => c.id === id)?.name ?? '—';
   const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? '—';
 
-  const hasFilter = !!(searchInput || categoryFilter || statusFilter || conditionFilter || custodianFilter);
+  const hasFilter = !!(searchInput || categoryFilter || conditionFilter || custodianFilter);
   function resetFilters() {
-    setSearchInput(''); setSearch(''); setCategoryFilter(''); setStatusFilter(''); setConditionFilter(''); setCustodianFilter('');
+    setSearchInput(''); setSearch(''); setCategoryFilter(''); setConditionFilter(''); setCustodianFilter('');
   }
 
   function toggleSort(k: SortKey) {
@@ -139,6 +141,15 @@ export default function AssetsPage() {
       toast('success', `${all.length} aset diekspor.`);
     } catch (e) {
       toast('error', e instanceof Error ? e.message : 'Gagal mengekspor aset.');
+    }
+  }
+
+  async function handleRestore(id: string, name: string) {
+    try {
+      await restore.mutateAsync(id);
+      toast('success', `"${name}" dipulihkan.`);
+    } catch {
+      toast('error', 'Gagal memulihkan aset.');
     }
   }
 
@@ -165,6 +176,7 @@ export default function AssetsPage() {
   const firstRow = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
   const lastRow = Math.min(page * PER_PAGE, total);
   const pageBtn = 'flex h-8 items-center rounded-lg border border-border-default px-3 text-sm font-semibold text-text-default hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-40';
+  const isTrashed = tab === 'trashed';
 
   return (
     <div>
@@ -224,23 +236,6 @@ export default function AssetsPage() {
                         {CONDITIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                       </Select>
                     </Field>
-                    <div>
-                      <span className="mb-1 block text-xs font-semibold text-text-default">Status</span>
-                      <div className="flex flex-col gap-1.5">
-                        {STATUS_OPTIONS.map((o) => (
-                          <label key={o.value} className="flex cursor-pointer items-center gap-2 text-sm text-text-default">
-                            <input
-                              type="radio"
-                              name="status-filter"
-                              className="accent-primary"
-                              checked={statusFilter === o.value}
-                              onChange={() => setStatusFilter(o.value)}
-                            />
-                            {o.label}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
@@ -251,10 +246,38 @@ export default function AssetsPage() {
       />
 
       <Card>
+        {/* Tabs: Aktif / Tidak Aktif / Trashed, each with a thin grey count badge. */}
+        <div className="flex items-center gap-1 border-b border-border-soft px-3 pt-2">
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={
+                  'relative -mb-px flex items-center gap-2 rounded-t-lg px-3 py-2 text-sm font-semibold transition-colors ' +
+                  (active
+                    ? 'border-b-2 border-primary text-text-strong'
+                    : 'border-b-2 border-transparent text-text-muted hover:text-text-default')
+                }
+              >
+                {t.label}
+                <span className="rounded-full bg-border-soft px-1.5 py-0.5 text-[11px] font-semibold text-text-muted">
+                  {counts[t.key]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {isLoading ? (
           <LoadingBlock />
         ) : rows.length === 0 ? (
-          <EmptyState title="Tidak ada aset" description="Ubah filter atau tambah aset baru." icon="▣" />
+          <EmptyState
+            title={isTrashed ? 'Sampah kosong' : 'Tidak ada aset'}
+            description={isTrashed ? 'Aset yang dihapus akan muncul di sini.' : 'Ubah filter atau tambah aset baru.'}
+            icon={isTrashed ? '🗑' : '▣'}
+          />
         ) : (
           <>
             <Table>
@@ -263,11 +286,11 @@ export default function AssetsPage() {
                   <Th align="center">No</Th>
                   <SortTh label="Kode / Nama" k="name" />
                   <SortTh label="Kategori" k="category" />
-                  <SortTh label="Penanggung Jawab" k="custodian" />
-                  {showValues && <SortTh label="Nilai Perolehan" k="acquisition_cost" align="right" />}
+                  <SortTh label="Tanggal Perolehan" k="acquisition_date" />
+                  <Th>Umur Aset</Th>
                   {showValues && <SortTh label="Nilai Buku" k="book_value" align="right" />}
                   <SortTh label="Kondisi" k="condition" align="center" />
-                  <SortTh label="Status" k="status" align="center" />
+                  {isTrashed && <Th align="center">Aksi</Th>}
                 </tr>
               </thead>
               <tbody>
@@ -275,10 +298,14 @@ export default function AssetsPage() {
                   <Tr key={a.id}>
                     <Td align="center" className="text-text-muted tabular-nums">{firstRow + i}</Td>
                     <Td>
-                      <Link to={`/aset/${a.id}`} className="font-semibold text-text-strong hover:text-primary hover:underline">
-                        {a.name}
-                      </Link>
-                      <div className="font-mono text-xs text-text-muted">{a.code} · {formatDate(a.acquisition_date)}</div>
+                      {isTrashed ? (
+                        <span className="font-semibold text-text-strong">{a.name}</span>
+                      ) : (
+                        <Link to={`/aset/${a.id}`} className="font-semibold text-text-strong hover:text-primary hover:underline">
+                          {a.name}
+                        </Link>
+                      )}
+                      <div className="font-mono text-xs text-text-muted">{a.code}</div>
                     </Td>
                     <Td>
                       <button
@@ -289,32 +316,28 @@ export default function AssetsPage() {
                         {categoryName(a.category_id)}
                       </button>
                     </Td>
-                    <Td>
-                      {a.custodian_id ? (
-                        <button
-                          onClick={() => setCustodianFilter(a.custodian_id as string)}
-                          className="text-left hover:text-primary hover:underline"
-                          title="Filter penanggung jawab ini"
-                        >
-                          {custodianName(a.custodian_id)}
-                        </button>
-                      ) : (
-                        <span>{custodianName(a.custodian_id)}</span>
-                      )}
-                      <div className="text-xs text-text-muted">{a.location}</div>
-                    </Td>
-                    {showValues && <Td align="right" className="font-mono">{formatIDR(a.acquisition_cost)}</Td>}
+                    <Td>{formatDate(a.acquisition_date)}</Td>
+                    <Td className="text-text-muted">{formatAge(a.acquisition_date)}</Td>
                     {showValues && <Td align="right" className="font-mono font-semibold text-text-strong">{formatIDR(a.book_value)}</Td>}
                     <Td align="center">
                       <button onClick={() => setConditionFilter(a.condition)} title="Filter kondisi ini">
                         <ConditionBadge condition={a.condition} />
                       </button>
                     </Td>
-                    <Td align="center">
-                      <button onClick={() => setStatusFilter(a.status)} title="Filter status ini">
-                        <AssetStatusBadge status={a.status} />
-                      </button>
-                    </Td>
+                    {isTrashed && (
+                      <Td align="center">
+                        {canManage && (
+                          <Button
+                            variant="secondary"
+                            className="px-2.5 py-1 text-xs"
+                            disabled={restore.isPending}
+                            onClick={() => handleRestore(a.id, a.name)}
+                          >
+                            Pulihkan
+                          </Button>
+                        )}
+                      </Td>
+                    )}
                   </Tr>
                 ))}
               </tbody>

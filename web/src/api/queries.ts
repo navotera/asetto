@@ -156,7 +156,8 @@ export interface AssetListParams {
   per_page?: number;
   search?: string;
   category_id?: string;
-  status?: string;
+  /** Which list tab: active (default) | inactive (disposed) | trashed. */
+  tab?: 'active' | 'inactive' | 'trashed';
   condition?: string;
   custodian_id?: string;
   entity_id?: string;
@@ -239,6 +240,11 @@ export function useSaveAsset() {
 export function useDeleteAsset() {
   const invalidate = useInvalidateAll();
   return useMutation({ mutationFn: (id: string) => api.del(`/assets/${id}`), onSuccess: invalidate });
+}
+
+export function useRestoreAsset() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: (id: string) => api.post(`/assets/${id}/restore`, {}), onSuccess: invalidate });
 }
 
 export function useImportAssets() {

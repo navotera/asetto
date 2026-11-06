@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAssets, useCreateDisposal, useDisposals } from '@/api/queries';
 import { PageHeader, Card, CardHeader, LoadingBlock, EmptyState, Button, Badge } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/Modal';
-import { Field, Input, NumberInput, Select, Spinner } from '@/components/ui/primitives';
+import { Field, DateInput, NumberInput, Select, Spinner } from '@/components/ui/primitives';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { formatIDR, formatDate } from '@/lib/format';
 import { useToast } from '@/components/ui/toast';
@@ -130,7 +130,7 @@ export default function DisposalPage() {
               </Select>
             </Field>
             <Field label="Tanggal">
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateInput value={date} onChange={(e) => setDate(e.target.value)} />
             </Field>
           </div>
           {type === 'sale' && (

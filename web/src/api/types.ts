@@ -7,6 +7,8 @@ export interface Paginated<T> {
   per_page: number;
   total: number;
   last_page: number;
+  /** Per-tab row counts (assets list: active / inactive / trashed). */
+  counts?: { active: number; inactive: number; trashed: number };
 }
 
 /** Public Ecopa integration status (no secrets) — drives the setup wizard. */
@@ -88,6 +90,8 @@ export interface Asset {
   serial_number?: string;
   notes?: string;
   status: AssetStatus;
+  /** True when the asset is soft-deleted (shown in the "Trashed" tab). */
+  trashed?: boolean;
   /** Derived, kept denormalised for list views. */
   accumulated_depreciation: number;
   book_value: number;

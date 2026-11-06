@@ -113,7 +113,12 @@ else {
 # --- Jalankan kedua server ---------------------------------------------------
 Write-Host '==> Menjalankan server...' -ForegroundColor Cyan
 
-Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location `"$backend`"; php artisan serve --host=127.0.0.1 --port=8090"
+# Backend: pakai `php -S` + router bawaan Laravel, BUKAN `php artisan serve`.
+# `php artisan serve` gagal bind di PHP 8.5.x Windows ("Failed to listen ...
+# (reason: ?)") padahal built-in server PHP sendiri jalan normal.
+$backendPublic = Join-Path $backend 'public'
+$laravelRouter = Join-Path $backend 'vendor\laravel\framework\src\Illuminate\Foundation\resources\server.php'
+Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location `"$backend`"; `$env:LARAVEL_PUBLIC_PATH='$backendPublic'; php -S 127.0.0.1:8090 -t `"$backendPublic`" `"$laravelRouter`""
 Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location `"$web`"; npm run dev"
 # Scheduler: retries the Akunta journal queue + runs scheduled depreciation.
 Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location `"$backend`"; php artisan schedule:work"

@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
+import { formatISODate } from '@/lib/format';
 
 // ---------------------------------------------------------------- Button
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -162,6 +164,81 @@ export function NumberInput({
     />
   );
 }
+/**
+ * A date field that DISPLAYS the configured app date format (General settings)
+ * while keeping its stored value as an ISO "YYYY-MM-DD" string. Selection uses
+ * the native date picker, so `onChange` emits `{ target: { value } }` with the
+ * ISO date — a drop-in for the `<Input type="date">` it replaces. The native
+ * control is kept (transparent, on top) for accessibility and keyboard entry.
+ */
+export function DateInput({
+  value,
+  onChange,
+  placeholder = 'Pilih tanggal',
+  className,
+  disabled,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+  value: string | null | undefined;
+  onChange: (e: { target: { value: string } }) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const iso = value ?? '';
+  const display = formatISODate(iso);
+  const openPicker = () => {
+    const el = ref.current;
+    if (!el || disabled) return;
+    try {
+      el.showPicker();
+    } catch {
+      el.focus();
+    }
+  };
+  return (
+    <div
+      className={cn(
+        fieldClass,
+        'relative flex cursor-pointer items-center gap-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20',
+        disabled && 'cursor-not-allowed opacity-50',
+        className,
+      )}
+      onClick={openPicker}
+    >
+      <span className={cn('flex-1 truncate', !display && 'text-text-muted')}>{display || placeholder}</span>
+      <svg
+        aria-hidden="true"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="shrink-0 text-text-muted"
+      >
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+      <input
+        {...props}
+        ref={ref}
+        type="date"
+        value={iso}
+        disabled={disabled}
+        onChange={(e) => onChange({ target: { value: e.target.value } })}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openPicker();
+          }
+        }}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </div>
+  );
+}
+
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={cn(fieldClass, props.className)} />;
 }

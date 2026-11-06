@@ -11,7 +11,7 @@ import {
   useCreateDisposal,
   useCan,
 } from '@/api/queries';
-import { PageHeader, Button, Card, CardHeader, LoadingBlock, EmptyState, Field, Input, NumberInput, Select, Spinner } from '@/components/ui/primitives';
+import { PageHeader, Button, Card, CardHeader, LoadingBlock, EmptyState, Field, Input, DateInput, NumberInput, Select, Spinner } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/Modal';
 import { KebabMenu } from '@/components/ui/KebabMenu';
 import { ConditionBadge, AssetStatusBadge } from '@/components/ui/badges';
@@ -402,7 +402,7 @@ export default function AssetDetailPage() {
               </Select>
             </Field>
             <Field label="Tanggal">
-              <Input type="date" value={disposalDate} onChange={(e) => setDisposalDate(e.target.value)} />
+              <DateInput value={disposalDate} onChange={(e) => setDisposalDate(e.target.value)} />
             </Field>
           </div>
           {disposalType === 'sale' && (

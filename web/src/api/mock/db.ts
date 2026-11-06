@@ -243,6 +243,13 @@ for (let i = 0; i < 100; i++) {
   );
 }
 
+// Demo spread so every list tab has content: a handful disposed (Tidak Aktif)
+// and a couple soft-deleted (Trashed). Trashed takes precedence over status.
+for (let i = 0; i < assets.length; i++) {
+  if (i % 13 === 7) assets[i].status = 'disposed';
+  if (i % 31 === 17) assets[i].trashed = true;
+}
+
 const runs: DepreciationRun[] = [];
 const disposals: Disposal[] = [];
 const journals: JournalEntry[] = [];
@@ -720,16 +727,28 @@ export const db = {
     const search = (params.search ?? '').toLowerCase().trim();
     if (search) list = list.filter((a) => a.name.toLowerCase().includes(search) || a.code.toLowerCase().includes(search));
     if (params.category_id) list = list.filter((a) => a.category_id === params.category_id);
-    if (params.status) list = list.filter((a) => a.status === params.status);
     if (params.condition) list = list.filter((a) => a.condition === params.condition);
     if (params.custodian_id) list = list.filter((a) => (a.custodian_id ?? '') === params.custodian_id);
     if (params.entity_id) list = list.filter((a) => a.entity_id === params.entity_id);
+
+    // Tab = active (default) | inactive (disposed) | trashed. Counts reflect the
+    // current filters (above) but not the tab itself.
+    const counts = {
+      active: list.filter((a) => !a.trashed && a.status === 'active').length,
+      inactive: list.filter((a) => !a.trashed && a.status === 'disposed').length,
+      trashed: list.filter((a) => !!a.trashed).length,
+    };
+    const tab = params.tab === 'inactive' || params.tab === 'trashed' ? params.tab : 'active';
+    if (tab === 'trashed') list = list.filter((a) => !!a.trashed);
+    else if (tab === 'inactive') list = list.filter((a) => !a.trashed && a.status === 'disposed');
+    else list = list.filter((a) => !a.trashed && a.status === 'active');
 
     const accessors: Record<string, (a: Asset) => string | number> = {
       code: (a) => a.code,
       name: (a) => a.name.toLowerCase(),
       category: (a) => categoryName(a.category_id).toLowerCase(),
       custodian: (a) => (custodianNameById(a.custodian_id) ?? '').toLowerCase(),
+      acquisition_date: (a) => a.acquisition_date ?? '',
       acquisition_cost: (a) => a.acquisition_cost ?? 0,
       book_value: (a) => a.book_value ?? 0,
       condition: (a) => a.condition,
@@ -750,7 +769,7 @@ export const db = {
     const total = list.length;
     const lastPage = Math.max(1, Math.ceil(total / perPage));
     const start = (page - 1) * perPage;
-    return { items: list.slice(start, start + perPage), page, per_page: perPage, total, last_page: lastPage };
+    return { items: list.slice(start, start + perPage), page, per_page: perPage, total, last_page: lastPage, counts };
   },
   getAsset: (assetId: string) => assets.find((a) => a.id === assetId) ?? null,
 
@@ -832,12 +851,22 @@ export const db = {
   },
 
   deleteAsset(assetId: string): void {
-    const i = assets.findIndex((a) => a.id === assetId);
-    if (i === -1) throw new ApiMockError(404, 'Aset tidak ditemukan');
-    if (assets[i].accumulated_depreciation > 0) {
+    const asset = assets.find((a) => a.id === assetId);
+    if (!asset) throw new ApiMockError(404, 'Aset tidak ditemukan');
+    if (asset.accumulated_depreciation > 0) {
       throw new ApiMockError(422, 'Aset sudah terdepresiasi — gunakan pelepasan, bukan hapus.');
     }
-    assets.splice(i, 1);
+    // Soft delete → moves to the "Trashed" tab (restorable), not removed.
+    asset.trashed = true;
+    auditPush(asset.id, 'trashed', 'Aset dipindahkan ke sampah.');
+  },
+
+  restoreAsset(assetId: string): Asset {
+    const asset = assets.find((a) => a.id === assetId);
+    if (!asset) throw new ApiMockError(404, 'Aset tidak ditemukan');
+    asset.trashed = false;
+    auditPush(asset.id, 'restored', 'Aset dipulihkan dari sampah.');
+    return asset;
   },
 
   setCondition(assetId: string, condition: Asset['condition']): Asset {

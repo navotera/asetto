@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDepreciationReport, useDepreciationReportCategory } from '@/api/queries';
-import { PageHeader, Card, CardHeader, Button, Field, Input, LoadingBlock, EmptyState, Spinner } from '@/components/ui/primitives';
+import { PageHeader, Card, CardHeader, Button, Field, DateInput, LoadingBlock, EmptyState, Spinner } from '@/components/ui/primitives';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { formatIDR } from '@/lib/format';
 import type { DepreciationReportCategory } from '@/api/types';
@@ -35,10 +35,10 @@ export default function DepreciationPage() {
       <Card className="mb-6">
         <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <Field label="Dari tanggal">
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateInput value={from} onChange={(e) => setFrom(e.target.value)} />
           </Field>
           <Field label="Sampai tanggal">
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateInput value={to} onChange={(e) => setTo(e.target.value)} />
           </Field>
           <div className="text-xs text-text-muted sm:pb-2.5">{isFetching ? 'Memuat…' : 'Default: bulan ini'}</div>
         </div>

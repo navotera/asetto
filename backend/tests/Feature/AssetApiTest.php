@@ -106,3 +106,60 @@ it('updates an asset condition', function () {
         ->assertOk()
         ->assertJsonPath('condition', 'needs_repair');
 });
+
+it('returns per-tab counts on the paginated list', function () {
+    // One disposed asset → inactive tab; the rest stay active.
+    Asset::where('code', 'AST-0002')->update(['status' => 'disposed']);
+
+    $this->getJson('/api/assets?page=1&per_page=25')
+        ->assertOk()
+        ->assertJsonPath('counts.active', 5)
+        ->assertJsonPath('counts.inactive', 1)
+        ->assertJsonPath('counts.trashed', 0)
+        ->assertJsonPath('total', 5); // default tab = active
+});
+
+it('lists disposed assets only under the inactive tab', function () {
+    Asset::where('code', 'AST-0002')->update(['status' => 'disposed']);
+
+    $res = $this->getJson('/api/assets?page=1&per_page=25&tab=inactive')->assertOk();
+    expect($res->json('items'))->toHaveCount(1);
+    expect($res->json('items.0.code'))->toBe('AST-0002');
+});
+
+it('soft-deletes an asset into the trashed tab', function () {
+    // Fresh asset has zero accumulated depreciation, so delete is allowed.
+    $id = $this->postJson('/api/assets', [
+        'name' => 'Kursi Lipat',
+        'entity_id' => \Akunta\Rbac\Models\Entity::query()->value('id'),
+        'category_id' => 'cat_mebel',
+        'acquisition_date' => '2026-02-01',
+        'acquisition_cost' => 1_000_000,
+    ])->assertCreated()->json('id');
+
+    $this->deleteJson("/api/assets/{$id}")->assertOk();
+
+    // Gone from the active tab, present (and flagged) in the trashed tab.
+    expect($this->getJson('/api/assets?page=1&per_page=50&tab=active')->json('total'))->toBe(6);
+    $trashed = $this->getJson('/api/assets?page=1&per_page=50&tab=trashed')->assertOk();
+    expect($trashed->json('counts.trashed'))->toBe(1);
+    expect(collect($trashed->json('items'))->pluck('id'))->toContain($id);
+    expect($trashed->json('items.0.trashed'))->toBeTrue();
+    $this->assertSoftDeleted('assets', ['id' => $id]);
+});
+
+it('restores a trashed asset back to the active tab', function () {
+    $id = $this->postJson('/api/assets', [
+        'name' => 'Kipas Angin',
+        'entity_id' => \Akunta\Rbac\Models\Entity::query()->value('id'),
+        'category_id' => 'cat_mebel',
+        'acquisition_date' => '2026-03-01',
+        'acquisition_cost' => 500_000,
+    ])->assertCreated()->json('id');
+
+    $this->deleteJson("/api/assets/{$id}")->assertOk();
+    $this->postJson("/api/assets/{$id}/restore")->assertOk()->assertJsonPath('trashed', false);
+
+    expect($this->getJson('/api/assets?page=1&per_page=50&tab=active')->json('total'))->toBe(7);
+    $this->assertNotSoftDeleted('assets', ['id' => $id]);
+});
