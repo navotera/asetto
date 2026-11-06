@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettings, useSaveSettings } from '@/api/queries';
-import { Card, CardHeader, LoadingBlock, Field, Input, Button, Spinner } from '@/components/ui/primitives';
+import { Card, CardHeader, LoadingBlock, Field, Input, Button, Select, Spinner } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
 import type { SyncSettings, RetentionSettings } from '@/api/types';
 
@@ -66,6 +66,15 @@ export function SyncPanel() {
     }
   }
 
+  async function saveMode(mode: 'auto_post' | 'draft') {
+    try {
+      await save.mutateAsync({ mode });
+      toast('success', 'Mode depresiasi disimpan.');
+    } catch {
+      toast('error', 'Gagal menyimpan.');
+    }
+  }
+
   async function saveRetention() {
     const retention: RetentionSettings = {
       trashed_months: Math.max(0, Number(trashedMonths) || 0),
@@ -81,6 +90,25 @@ export function SyncPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader
+          title="Depresiasi Terjadwal"
+          subtitle="Cara cron menjalankan depresiasi bulanan otomatis — ini soal alur jalankan/approve, berbeda dari sakelar kirim-ke-Akunta di bawah."
+        />
+        <div className="px-5 py-4">
+          <Field label="Mode" hint="Auto-post: langsung commit lalu masuk antrean Akunta. Draft: dibuat draft untuk disetujui admin dulu.">
+            <Select
+              value={settings.mode ?? 'auto_post'}
+              disabled={save.isPending}
+              onChange={(e) => saveMode(e.target.value as 'auto_post' | 'draft')}
+            >
+              <option value="auto_post">Auto-post (otomatis ke Akunta)</option>
+              <option value="draft">Draft (perlu persetujuan admin)</option>
+            </Select>
+          </Field>
+        </div>
+      </Card>
+
       <Card>
         <CardHeader
           title="Sinkronisasi Akunta"

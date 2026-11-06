@@ -34,8 +34,7 @@ const SECTIONS: Section[] = [
   { id: 'umum', label: 'Umum', description: 'Zona waktu & format tanggal', icon: '⚙', adminOnly: true },
   { id: 'profil', label: 'Profil Pengguna', description: 'Identitas dari Ecopa', icon: '◉' },
   { id: 'entitas', label: 'Entitas', description: 'Perusahaan (PT) & jurnal', icon: '◫', adminOnly: true },
-  { id: 'depresiasi', label: 'Depresiasi Terjadwal', description: 'Mode posting otomatis', icon: '↘', adminOnly: true },
-  { id: 'sinkron', label: 'Sinkronisasi Akunta', description: 'Peristiwa ekonomi ke Akunta', icon: '⤤', adminOnly: true },
+  { id: 'sinkron', label: 'Sinkronisasi Akunta', description: 'Depresiasi terjadwal & peristiwa ekonomi', icon: '⤤', adminOnly: true },
   { id: 'cron', label: 'Penjadwalan (Cron)', description: 'Status scheduler & tugas', icon: '⏱', adminOnly: true },
   { id: 'penyimpanan', label: 'Penyimpanan File', description: 'Disk foto & bukti', icon: '▤', adminOnly: true },
   { id: 'users', label: 'User & Roles', description: 'Assign role & impersonate', icon: '♙', adminOnly: true },
@@ -117,24 +116,6 @@ export default function SettingsPage() {
               <Row label="Email" value={me?.email ?? '—'} />
               <Row label="Peran Ekosistem" value={<Badge tone="info">{me?.app_role ?? '—'}</Badge>} />
               <Row label="Peran Asetto" value={me?.role ?? (me?.roles?.length ? me.roles.join(', ') : '—')} />
-            </Card>
-          )}
-
-          {current?.id === 'depresiasi' && (
-            <Card>
-              <CardHeader title="Depresiasi Terjadwal" subtitle="Cara menjalankan depresiasi bulanan otomatis." />
-              <div className="px-5 py-4">
-                <Field label="Mode" hint="Auto-post langsung kirim jurnal ke Akunta; draft perlu disetujui admin.">
-                  <Select
-                    value={settings?.mode ?? 'auto_post'}
-                    disabled={save.isPending || !settings}
-                    onChange={(e) => update({ mode: e.target.value as 'auto_post' | 'draft' })}
-                  >
-                    <option value="auto_post">Auto-post (otomatis ke Akunta)</option>
-                    <option value="draft">Draft (perlu persetujuan admin)</option>
-                  </Select>
-                </Field>
-              </div>
             </Card>
           )}
 
