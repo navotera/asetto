@@ -60,6 +60,10 @@ export interface AssetCategory {
 export interface Entity {
   id: string;
   name: string;
+  /** Toggled on/off in settings; only enabled entities appear in the switcher. */
+  enabled: boolean;
+  /** The entity selected by default when none is remembered. */
+  is_default: boolean;
 }
 
 export interface Custodian {

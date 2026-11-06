@@ -19,9 +19,12 @@ export function EntitySwitcher() {
   const ref = useRef<HTMLDivElement>(null);
 
   const canManage = me?.app_role === 'admin' || can('settings.manage');
-  const list = entities ?? [];
-  // Exactly one entity is always active (no "all"); fall back to the first.
-  const active = list.find((e) => e.id === activeEntityId) ?? list[0] ?? null;
+  // Only enabled entities are selectable; the default is the one flagged
+  // is_default (fallback: first enabled).
+  const list = (entities ?? []).filter((e) => e.enabled);
+  const defaultEntity = list.find((e) => e.is_default) ?? list[0] ?? null;
+  // Exactly one entity is always active (no "all"); fall back to the default.
+  const active = list.find((e) => e.id === activeEntityId) ?? defaultEntity;
   const label = active?.name ?? 'Entitas';
   const badge = active ? active.name.charAt(0).toUpperCase() : '∗';
 
@@ -34,13 +37,14 @@ export function EntitySwitcher() {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
-  // Always keep exactly one entity active: on first load, or if the active one
-  // was deleted elsewhere, select the first available entity.
+  // Always keep exactly one ENABLED entity active: on first load, or if the
+  // remembered one was disabled/deleted, fall back to the default entity.
   useEffect(() => {
-    if (!entities || entities.length === 0) return;
-    if (!activeEntityId || !entities.some((e) => e.id === activeEntityId)) {
-      setActiveEntityId(entities[0].id);
+    if (list.length === 0) return;
+    if (!activeEntityId || !list.some((e) => e.id === activeEntityId)) {
+      setActiveEntityId((list.find((e) => e.is_default) ?? list[0]).id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEntityId, entities, setActiveEntityId]);
 
   function pick(id: string | null) {

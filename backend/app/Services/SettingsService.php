@@ -36,6 +36,9 @@ class SettingsService
         // Auto-prune retention for the economic-event queue.
         'retention.trashed_months' => '3',
         'retention.accepted_years' => '2',
+        // Entity switcher: ids toggled off (not selectable) + the default entity.
+        'entities.disabled_ids' => '[]',
+        'entities.default_id' => '',
     ];
 
     public const SYNC_EVENTS = ['acquisition', 'depreciation', 'disposal'];
@@ -135,6 +138,38 @@ class SettingsService
             'trashed_months' => $this->retentionTrashedMonths(),
             'accepted_years' => $this->retentionAcceptedYears(),
         ];
+    }
+
+    /**
+     * Entity ids toggled OFF in settings (not selectable in the switcher).
+     *
+     * @return array<int, string>
+     */
+    public function entityDisabledIds(): array
+    {
+        $raw = $this->get('entities.disabled_ids', '[]');
+        $ids = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        return is_array($ids) ? array_values(array_filter(array_map('strval', $ids))) : [];
+    }
+
+    /** @param array<int, string> $ids */
+    public function setEntityDisabledIds(array $ids): void
+    {
+        $this->set('entities.disabled_ids', json_encode(array_values(array_unique($ids))));
+    }
+
+    /** The entity selected by default when none is remembered (or null → first enabled). */
+    public function entityDefaultId(): ?string
+    {
+        $id = trim((string) $this->get('entities.default_id', ''));
+
+        return $id !== '' ? $id : null;
+    }
+
+    public function setEntityDefaultId(?string $id): void
+    {
+        $this->set('entities.default_id', (string) ($id ?? ''));
     }
 
     /** Disk uploaded files are written to (falls back to a disk that exists). */

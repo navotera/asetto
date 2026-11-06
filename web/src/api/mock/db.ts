@@ -52,8 +52,8 @@ function monthsBetween(from: string, to: string): number {
 // Companies the assets belong to. The id is Asetto's own, human-readable slug
 // (e.g. "PT Guna Dharma" → ent_guna_dharma_x7k2); Akunta maps it via Auto Mapping.
 const entities: Entity[] = [
-  { id: 'ent_asetto_nusantara', name: 'PT Asetto Nusantara' },
-  { id: 'ent_mitra_sejahtera', name: 'PT Mitra Sejahtera' },
+  { id: 'ent_asetto_nusantara', name: 'PT Asetto Nusantara', enabled: true, is_default: true },
+  { id: 'ent_mitra_sejahtera', name: 'PT Mitra Sejahtera', enabled: true, is_default: false },
 ];
 
 /** Readable, unique entity id derived from the name — mirrors the backend. */
@@ -684,9 +684,38 @@ export const db = {
   entities: () => entities,
   createEntity(input: { name?: string }): Entity {
     const name = input.name?.trim() || 'Entitas Baru';
-    const e: Entity = { id: entitySlugId(name), name };
+    const e: Entity = { id: entitySlugId(name), name, enabled: true, is_default: false };
     entities.push(e);
     return e;
+  },
+
+  setEntityEnabled(entityId: string, enabled: boolean): Entity[] {
+    const e = entities.find((x) => x.id === entityId);
+    if (!e) throw new ApiMockError(404, 'Entitas tidak ditemukan');
+    if (!enabled) {
+      if (entities.filter((x) => x.enabled).length <= 1 && e.enabled) {
+        throw new ApiMockError(422, 'Minimal satu entitas harus aktif.');
+      }
+      e.enabled = false;
+      // Disabling the default → move default to the first still-enabled entity.
+      if (e.is_default) {
+        e.is_default = false;
+        const next = entities.find((x) => x.enabled);
+        if (next) next.is_default = true;
+      }
+    } else {
+      e.enabled = true;
+    }
+    return entities;
+  },
+
+  setDefaultEntity(entityId: string): Entity[] {
+    const e = entities.find((x) => x.id === entityId);
+    if (!e) throw new ApiMockError(404, 'Entitas tidak ditemukan');
+    entities.forEach((x) => (x.is_default = false));
+    e.is_default = true;
+    e.enabled = true;
+    return entities;
   },
 
   createCategory(input: Partial<AssetCategory>): AssetCategory {

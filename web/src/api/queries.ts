@@ -225,6 +225,23 @@ export function useSaveEntity() {
   });
 }
 
+export function useSetEntityEnabled() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      api.patch<Entity[]>(`/entities/${id}`, { enabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.entities }),
+  });
+}
+
+export function useSetDefaultEntity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Entity[]>(`/entities/${id}/default`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.entities }),
+  });
+}
+
 export const useCustodians = () =>
   useQuery({ queryKey: keys.custodians, queryFn: () => api.get<Custodian[]>('/custodians') });
 

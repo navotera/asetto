@@ -106,6 +106,8 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('scheduler/health', [SchedulerHealthController::class, 'index']);
         Route::patch('custodians/{custodian}', [CustodianController::class, 'link']);
         Route::post('entities', [EntityController::class, 'store']);
+        Route::patch('entities/{entity}', [EntityController::class, 'setEnabled']);
+        Route::post('entities/{entity}/default', [EntityController::class, 'setDefault']);
 
         Route::get('role-management', [RoleManagementController::class, 'index']);
         Route::post('role-management/assign', [RoleManagementController::class, 'assign']);
