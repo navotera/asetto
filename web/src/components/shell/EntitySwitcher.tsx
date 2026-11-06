@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEntities, useMe, useCan } from '@/api/queries';
 import { useActiveEntity } from '@/hooks/useActiveEntity';
-import { EntityFormModal } from '@/pages/EntityFormModal';
 import { cn } from '@/lib/cn';
 
 /**
  * Active-entity switcher in the topbar (mirrors Akunta's workspace switcher,
  * contextual to Asetto's entities). Picking an entity scopes list views; admins
- * can add a new entity inline. Placed just before the user menu.
+ * jump to entity settings from here. Placed just before the user menu.
  */
 export function EntitySwitcher() {
   const { data: entities } = useEntities();
   const { data: me } = useMe();
   const { can } = useCan();
   const { activeEntityId, setActiveEntityId } = useActiveEntity();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const canManage = me?.app_role === 'admin' || can('settings.manage');
@@ -102,18 +102,16 @@ export function EntitySwitcher() {
               <button
                 onClick={() => {
                   setOpen(false);
-                  setAddOpen(true);
+                  navigate('/pengaturan?section=entitas');
                 }}
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-primary hover:bg-primary-light"
               >
-                <span className="text-base leading-none">＋</span> Tambah Entitas
+                <span aria-hidden="true" className="text-base leading-none">⚙</span> Pengaturan
               </button>
             </div>
           )}
         </div>
       )}
-
-      <EntityFormModal open={addOpen} onClose={() => setAddOpen(false)} onCreated={(e) => setActiveEntityId(e.id)} />
     </div>
   );
 }
