@@ -119,20 +119,31 @@ Satu endpoint `POST {APP_URL}/webhooks/ecopa`, verifikasi signature
 
 | Event | Tindakan Asetto |
 |---|---|
-| `user.assigned` | Buat/aktifkan shadow user + assignment, `role_id=null` |
+| `user.assigned` | Buat/aktifkan shadow user + assignment keanggotaan (app-wide). Role default di-set otomatis: **admin → role `admin`, selain itu → `operator`** (`config/asetto_permissions.php:default_role`). Pilihan role manual admin yang sudah ada dipertahankan (hanya di-set saat `role_id` masih null). |
 | `user.updated` | Perbarui nama/email shadow user |
 | `user.revoked` | Cabut assignment + sesi/token, pertahankan histori |
 | `user.deleted` | Nonaktifkan user + akses, pertahankan record historis |
 
-### Role: dua lapis
+### Role & akses entitas
 
-- Ecopa hanya kirim `app_role` = `admin` atau `user`.
-- Role rinci Asetto (mis. Asset Manager, Custodian, Viewer) ditentukan **lokal
-  di Asetto** lewat UI role-nya sendiri; `app_role` dari Ecopa tidak menentukan
-  role rinci. Assignment lokal dibuat `role_id=null`, lalu admin pilih role.
+- Ecopa hanya kirim `app_role` = `admin` atau `user`. User yang **available** di
+  Asetto adalah yang sudah di-assign ke app di Ecopa (lewat webhook di atas) —
+  tidak ada jalur provisioning via email.
+- **Role default** saat assignment: `operator` (untuk non-admin) atau `admin`.
+  Role rinci lain (Asset Manager, User, dst.) dipilih admin lewat UI. Daftar role
+  ada di `config/asetto_permissions.php`.
+- **Akses entitas TIDAK otomatis.** Assignment keanggotaan app-wide
+  (`entity_id = null`) tidak memberi akses ke entitas mana pun. Admin menetapkan
+  akses per-entitas di **Pengaturan → Entitas** (klik entitas → tambah user
+  dengan role di bawah admin); ini membuat assignment ber-`entity_id`.
+  - Non-admin: `getTenants()/accessibleEntityIds()` hanya dari assignment
+    ber-`entity_id`. `EntityController@index` & `AssetController@index`
+    di-scope ke entitas tsb; `show`/mutasi aset dijaga `authorizeEntity()`.
+  - Admin (SSO `app_role=admin` atau role lokal `admin`): akses semua entitas.
 - **Gerbang keamanan sebenarnya ada di Asetto** (session guard + assignment
-  tersinkron webhook), bukan di menu Ekosistem Akunta. Backend wajib otorisasi
-  tiap mutasi; menyembunyikan menu/tombol bukan security boundary.
+  tersinkron webhook + scoping entitas di atas), bukan di menu Ekosistem Akunta.
+  Backend wajib otorisasi tiap mutasi; menyembunyikan menu/tombol bukan security
+  boundary.
 
 ### Menu Ekosistem
 
