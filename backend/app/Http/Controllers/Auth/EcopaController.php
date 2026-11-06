@@ -50,6 +50,13 @@ class EcopaController extends EcopaAuthController
             }
         }
 
+        // A user disabled in Ecopa (via the user.disabled webhook) cannot log in.
+        // Re-enabling only happens through a user.enabled / user.assigned webhook,
+        // never by logging in — so we never silently clear disabled_at here.
+        if ($user && $user->disabled_at) {
+            abort(403, 'Akun Anda dinonaktifkan. Hubungi admin Ecopa.');
+        }
+
         if (! $user) {
             if ($appRole !== 'admin') {
                 abort(403, 'Akun belum di-assign ke Asetto. Hubungi admin Ecopa.');
@@ -65,7 +72,6 @@ class EcopaController extends EcopaAuthController
         if ($name && $user->name !== $name) {
             $user->name = $name;
         }
-        $user->disabled_at = null;
         $user->last_login_at = now();
         $user->save();
 
