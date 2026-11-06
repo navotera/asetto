@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import {
   useEntities,
   useSetEntityEnabled,
@@ -8,90 +8,101 @@ import {
   useUnassignEntityUser,
 } from '@/api/queries';
 import { useActiveEntity } from '@/hooks/useActiveEntity';
-import { Card, CardHeader, Button, LoadingBlock, EmptyState, Toggle, Select, Spinner } from '@/components/ui/primitives';
+import { Card, CardHeader, Button, LoadingBlock, EmptyState, Toggle, Select, Badge } from '@/components/ui/primitives';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/toast';
 import { EntityFormModal } from '@/pages/EntityFormModal';
-import { cn } from '@/lib/cn';
+import type { Entity } from '@/api/types';
 
-/** Assigned-user management for one entity — shown when its row is clicked. */
-function EntityUsersManager({ entityId, entityName }: { entityId: string; entityName: string }) {
-  const { data, isLoading } = useEntityUsers(entityId);
-  const assign = useAssignEntityUser(entityId);
-  const unassign = useUnassignEntityUser(entityId);
+/**
+ * Focused single-entity page: manage which Ecopa-synced users may access this
+ * entity, with Assigned / Available tabs like the User & Roles screen.
+ */
+function EntityUsersPage({ entity, onBack }: { entity: Entity; onBack: () => void }) {
+  const { data, isLoading } = useEntityUsers(entity.id);
+  const assign = useAssignEntityUser(entity.id);
+  const unassign = useUnassignEntityUser(entity.id);
   const toast = useToast();
-  const [userId, setUserId] = useState('');
-  const [roleId, setRoleId] = useState('');
+
+  const [tab, setTab] = useState<'assigned' | 'available'>('assigned');
+  const [availableRole, setAvailableRole] = useState<Record<string, string>>({});
 
   const roles = data?.roles ?? [];
-  const assignable = data?.assignable ?? [];
   const assigned = data?.assigned ?? [];
-  const effectiveRole = roleId || roles[0]?.id || '';
+  const assignable = data?.assignable ?? [];
+  const defaultRoleId = roles[0]?.id ?? '';
+  const busy = assign.isPending || unassign.isPending;
 
-  async function add() {
-    if (!userId) {
-      toast('error', 'Pilih pengguna dulu.');
-      return;
-    }
+  async function setRole(userId: string, roleId: string) {
     try {
-      await assign.mutateAsync({ user_id: userId, role_id: effectiveRole });
-      setUserId('');
+      await assign.mutateAsync({ user_id: userId, role_id: roleId });
+      toast('success', 'Role diperbarui.');
+    } catch (e) {
+      toast('error', e instanceof Error ? e.message : 'Gagal memperbarui role.');
+    }
+  }
+
+  async function addUser(userId: string, roleId: string) {
+    if (!roleId) return;
+    try {
+      await assign.mutateAsync({ user_id: userId, role_id: roleId });
       toast('success', 'Pengguna ditambahkan ke entitas.');
     } catch (e) {
       toast('error', e instanceof Error ? e.message : 'Gagal menambahkan pengguna.');
     }
   }
 
-  async function remove(uid: string, name: string | null) {
+  async function remove(userId: string, name: string | null) {
     try {
-      await unassign.mutateAsync(uid);
+      await unassign.mutateAsync(userId);
       toast('success', `${name ?? 'Pengguna'} dilepas dari entitas.`);
     } catch {
       toast('error', 'Gagal melepas pengguna.');
     }
   }
 
-  const busy = assign.isPending || unassign.isPending;
-
   return (
-    <div className="border-t border-border-soft bg-page-bg/40 px-5 py-4">
-      <h4 className="mb-3 text-sm font-semibold text-text-strong">Pengguna — {entityName}</h4>
+    <Card>
+      <div className="flex items-center justify-between gap-3 border-b border-border-soft px-5 py-4">
+        <div className="min-w-0">
+          <button onClick={onBack} className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+            ← Kembali ke Daftar Entitas
+          </button>
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-sm font-semibold text-text-strong">{entity.name}</h3>
+            {entity.is_default && (
+              <span className="inline-flex items-center rounded-md bg-success-light px-2 py-0.5 text-xs font-semibold text-success">Default</span>
+            )}
+          </div>
+          <p className="mt-0.5 font-mono text-xs text-text-muted">{entity.id}</p>
+        </div>
+      </div>
 
-      {/* Add a synced user to this entity. */}
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="flex-1">
-          <span className="mb-1 block text-xs font-semibold text-text-default">Tambah pengguna</span>
-          <Select value={userId} onChange={(e) => setUserId(e.target.value)} disabled={assignable.length === 0}>
-            <option value="">{assignable.length === 0 ? '— semua pengguna sudah ditambahkan —' : '— pilih pengguna —'}</option>
-            {assignable.map((u) => (
-              <option key={u.user_id} value={u.user_id}>{u.name}{u.email ? ` (${u.email})` : ''}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="sm:w-48">
-          <span className="mb-1 block text-xs font-semibold text-text-default">Role</span>
-          <Select value={effectiveRole} onChange={(e) => setRoleId(e.target.value)}>
-            {roles.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </Select>
-        </label>
-        <Button onClick={add} disabled={busy || !userId}>
-          {assign.isPending && <Spinner />} Tambah
-        </Button>
+      {/* Tabs mirror the User & Roles screen. */}
+      <div className="flex gap-1 border-b border-border-soft px-5 pt-3">
+        {([['assigned', `Assigned (${assigned.length})`], ['available', `Available (${assignable.length})`]] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${tab === key ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-default'}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {isLoading ? (
         <LoadingBlock />
-      ) : assigned.length === 0 ? (
-        <p className="py-2 text-sm text-text-muted">Belum ada pengguna di entitas ini.</p>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border-soft">
+      ) : tab === 'assigned' ? (
+        assigned.length === 0 ? (
+          <EmptyState title="Belum ada pengguna" description="Tambahkan pengguna dari tab Available." icon="♙" />
+        ) : (
           <Table>
             <thead>
               <tr>
-                <Th>Nama</Th>
+                <Th>User</Th>
                 <Th>Role</Th>
+                <Th align="center">Status</Th>
                 <Th align="right">Aksi</Th>
               </tr>
             </thead>
@@ -99,10 +110,22 @@ function EntityUsersManager({ entityId, entityName }: { entityId: string; entity
               {assigned.map((u) => (
                 <Tr key={u.assignment_id}>
                   <Td>
-                    <span className="font-semibold text-text-strong">{u.name}</span>
-                    {u.email && <div className="text-xs text-text-muted">{u.email}</div>}
+                    <div className="font-semibold text-text-strong">{u.name}</div>
+                    <div className="text-xs text-text-muted">{u.email}</div>
                   </Td>
-                  <Td>{u.role_name ?? '—'}</Td>
+                  <Td>
+                    <Select
+                      value={u.role_id ?? ''}
+                      disabled={busy}
+                      onChange={(e) => setRole(u.user_id, e.target.value)}
+                      className="min-w-[10rem]"
+                    >
+                      {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </Select>
+                  </Td>
+                  <Td align="center">
+                    {u.disabled_at ? <Badge tone="danger">Dinonaktifkan</Badge> : <Badge tone="success">Aktif</Badge>}
+                  </Td>
                   <Td align="right">
                     <button
                       onClick={() => remove(u.user_id, u.name)}
@@ -116,16 +139,55 @@ function EntityUsersManager({ entityId, entityName }: { entityId: string; entity
               ))}
             </tbody>
           </Table>
-        </div>
+        )
+      ) : assignable.length === 0 ? (
+        <EmptyState title="Tidak ada pengguna tersedia" description="Semua pengguna tersinkron sudah ditambahkan ke entitas ini." icon="✓" />
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <Th>User</Th>
+              <Th align="right">Assign Role</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {assignable.map((u) => (
+              <Tr key={u.user_id}>
+                <Td>
+                  <div className="font-semibold text-text-strong">{u.name}</div>
+                  <div className="text-xs text-text-muted">{u.email}</div>
+                </Td>
+                <Td align="right">
+                  <div className="flex items-center justify-end gap-2">
+                    <Select
+                      value={availableRole[u.user_id] ?? defaultRoleId}
+                      onChange={(e) => setAvailableRole((s) => ({ ...s, [u.user_id]: e.target.value }))}
+                      className="min-w-[9rem]"
+                    >
+                      {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </Select>
+                    <Button
+                      className="px-3 py-1.5"
+                      disabled={busy}
+                      onClick={() => addUser(u.user_id, availableRole[u.user_id] ?? defaultRoleId)}
+                    >
+                      Assign
+                    </Button>
+                  </div>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
       )}
-    </div>
+    </Card>
   );
 }
 
 /**
  * Entity (company/PT) management. Toggle an entity on/off to control whether it
- * can be picked in the top switcher, mark one as the default, and click a row to
- * manage which Ecopa-synced users may access it (and with which role).
+ * can be picked in the top switcher, mark one as the default, and click an
+ * entity name to open its focused user-management page.
  */
 export function EntitiesPanel() {
   const { data: entities, isLoading } = useEntities();
@@ -134,7 +196,9 @@ export function EntitiesPanel() {
   const setDefault = useSetDefaultEntity();
   const toast = useToast();
   const [addOpen, setAddOpen] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selected = entities?.find((e) => e.id === selectedId) ?? null;
 
   async function handleToggle(id: string, enabled: boolean) {
     try {
@@ -155,11 +219,16 @@ export function EntitiesPanel() {
 
   const busy = setEnabled.isPending || setDefault.isPending;
 
+  // Focused single-entity page.
+  if (selected) {
+    return <EntityUsersPage entity={selected} onBack={() => setSelectedId(null)} />;
+  }
+
   return (
     <Card>
       <CardHeader
         title="Entitas"
-        subtitle="Klik entitas untuk mengelola penggunanya. Hanya pengguna yang sudah di-assign Ecopa yang bisa ditambahkan."
+        subtitle="Klik nama entitas untuk mengelola penggunanya. Hanya pengguna yang sudah di-assign Ecopa yang bisa ditambahkan."
         action={<Button onClick={() => setAddOpen(true)}>+ Tambah Entitas</Button>}
       />
       {isLoading ? (
@@ -177,66 +246,53 @@ export function EntitiesPanel() {
             </tr>
           </thead>
           <tbody>
-            {entities.map((e) => {
-              const expanded = expandedId === e.id;
-              return (
-                <Fragment key={e.id}>
-                  <Tr>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setExpandedId(expanded ? null : e.id)}
-                          className="flex items-center gap-1.5 text-left hover:text-primary"
-                          title="Kelola pengguna entitas"
-                        >
-                          <span aria-hidden className="text-[10px] text-text-muted">{expanded ? '▾' : '▸'}</span>
-                          <span className="font-semibold text-text-strong">{e.name}</span>
-                        </button>
-                        {e.is_default ? (
-                          <span className="inline-flex items-center rounded-md bg-success-light px-2 py-0.5 text-xs font-semibold text-success">
-                            Default
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleSetDefault(e.id, e.name)}
-                            disabled={busy || !e.enabled}
-                            className="text-xs font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:text-text-muted disabled:no-underline"
-                            title={e.enabled ? 'Jadikan entitas default' : 'Aktifkan dulu untuk menjadikan default'}
-                          >
-                            Set default
-                          </button>
-                        )}
-                      </div>
-                    </Td>
-                    <Td className="font-mono text-xs text-text-muted">{e.id}</Td>
-                    <Td align="center">
+            {entities.map((e) => (
+              <Tr key={e.id}>
+                <Td>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedId(e.id)}
+                      className="text-left font-semibold text-text-strong hover:text-primary hover:underline"
+                      title="Kelola pengguna entitas"
+                    >
+                      {e.name}
+                    </button>
+                    {e.is_default ? (
+                      <span className="inline-flex items-center rounded-md bg-success-light px-2 py-0.5 text-xs font-semibold text-success">
+                        Default
+                      </span>
+                    ) : (
                       <button
-                        onClick={() => setExpandedId(expanded ? null : e.id)}
-                        className="inline-flex min-w-[1.75rem] items-center justify-center rounded-full bg-border-soft px-2 py-0.5 text-xs font-semibold text-text-muted hover:bg-primary-light hover:text-primary"
-                        title="Lihat pengguna"
+                        onClick={() => handleSetDefault(e.id, e.name)}
+                        disabled={busy || !e.enabled}
+                        className="text-xs font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:text-text-muted disabled:no-underline"
+                        title={e.enabled ? 'Jadikan entitas default' : 'Aktifkan dulu untuk menjadikan default'}
                       >
-                        {e.user_count ?? 0}
+                        Set default
                       </button>
-                    </Td>
-                    <Td align="center">
-                      <Toggle
-                        checked={e.enabled}
-                        disabled={busy}
-                        onChange={(v) => handleToggle(e.id, v)}
-                        label={`Aktifkan ${e.name}`}
-                      />
-                    </Td>
-                  </Tr>
-                  {expanded && (
-                    <tr>
-                      <td colSpan={4} className="p-0">
-                        <EntityUsersManager entityId={e.id} entityName={e.name} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
+                    )}
+                  </div>
+                </Td>
+                <Td className="font-mono text-xs text-text-muted">{e.id}</Td>
+                <Td align="center">
+                  <button
+                    onClick={() => setSelectedId(e.id)}
+                    className="inline-flex min-w-[1.75rem] items-center justify-center rounded-full bg-border-soft px-2 py-0.5 text-xs font-semibold text-text-muted hover:bg-primary-light hover:text-primary"
+                    title="Kelola pengguna"
+                  >
+                    {e.user_count ?? 0}
+                  </button>
+                </Td>
+                <Td align="center">
+                  <Toggle
+                    checked={e.enabled}
+                    disabled={busy}
+                    onChange={(v) => handleToggle(e.id, v)}
+                    label={`Aktifkan ${e.name}`}
+                  />
+                </Td>
+              </Tr>
+            ))}
           </tbody>
         </Table>
       )}
