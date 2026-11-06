@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettings } from '@/api/queries';
-import { setDateFormat } from '@/lib/format';
+import { setDateFormat, useDateFormat } from '@/lib/format';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ImpersonationBanner } from './ImpersonationBanner';
@@ -13,7 +13,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   // Apply the configured date format app-wide so formatDate() follows it.
+  // Subscribing via useDateFormat() re-renders the whole app (and thus every
+  // date label) the moment the format changes — e.g. right after it is saved.
   const { data: settings } = useSettings();
+  useDateFormat();
   useEffect(() => {
     setDateFormat(settings?.general?.date_format);
   }, [settings]);

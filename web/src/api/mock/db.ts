@@ -292,6 +292,32 @@ const settings = {
   general: { timezone: 'Asia/Jakarta', date_format: 'd F Y' },
 };
 
+// Mock-only: persist settings to localStorage so they survive a page reload
+// (the in-memory mock otherwise resets to defaults, which reads as "not saved").
+const SETTINGS_KEY = 'asetto:mock-settings';
+try {
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
+  if (saved && typeof saved === 'object') {
+    if (saved.mode) settings.mode = saved.mode;
+    if (saved.disk) settings.disk = saved.disk;
+    if (saved.sync) settings.sync = { ...settings.sync, ...saved.sync };
+    if (saved.retention) settings.retention = { ...settings.retention, ...saved.retention };
+    if (saved.general) settings.general = { ...settings.general, ...saved.general };
+  }
+} catch {
+  /* private mode / blocked storage — ignore */
+}
+function persistSettings() {
+  try {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ mode: settings.mode, disk: settings.disk, sync: settings.sync, retention: settings.retention, general: settings.general }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 const TIMEZONES = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'Asia/Singapore', 'UTC'];
 
 // Mock Ecopa integration state — starts unconfigured so the setup wizard is
@@ -1154,6 +1180,7 @@ export const db = {
     if (patch.sync) settings.sync = { ...settings.sync, ...patch.sync };
     if (patch.retention) settings.retention = { ...settings.retention, ...patch.retention };
     if (patch.general) settings.general = { ...settings.general, ...patch.general };
+    persistSettings();
     return { ...settings, timezones: TIMEZONES };
   },
 

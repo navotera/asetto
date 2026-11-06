@@ -5,9 +5,11 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { queryClient } from './lib/queryClient';
 import { restoreColorMode } from './hooks/useColorMode';
+import { restoreDateFormat } from './lib/format';
 import './index.css';
 
 restoreColorMode();
+restoreDateFormat();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
