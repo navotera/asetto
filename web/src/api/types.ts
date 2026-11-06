@@ -97,6 +97,7 @@ export interface Custodian {
   type: CustodianType;
   code: string;
   name: string;
+  email?: string | null;
   department?: string | null;
   user_id?: string | null;
   ecopa_user_id?: string | null;

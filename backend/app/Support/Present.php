@@ -79,6 +79,7 @@ class Present
             'type' => $c->type,
             'code' => $c->code,
             'name' => $c->name,
+            'email' => $c->email,
             'department' => $c->department,
             'user_id' => $c->user_id,
             'ecopa_user_id' => $c->relationLoaded('user') ? $c->user?->main_tier_user_id : null,

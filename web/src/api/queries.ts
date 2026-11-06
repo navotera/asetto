@@ -143,6 +143,14 @@ export function useLinkCustodian() {
   });
 }
 
+export function useAutoLinkCustodians() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ linked: number; custodians: Custodian[] }>('/custodians/auto-link', {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.custodians }),
+  });
+}
+
 export const useMyAssets = () =>
   useQuery({ queryKey: keys.myAssets, queryFn: () => api.get<MyAsset[]>('/assets/mine') });
 

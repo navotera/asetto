@@ -104,6 +104,7 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);
         Route::get('scheduler/health', [SchedulerHealthController::class, 'index']);
+        Route::post('custodians/auto-link', [CustodianController::class, 'autoLink']);
         Route::patch('custodians/{custodian}', [CustodianController::class, 'link']);
         Route::post('entities', [EntityController::class, 'store']);
         Route::patch('entities/{entity}', [EntityController::class, 'setEnabled']);

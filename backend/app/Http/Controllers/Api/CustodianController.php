@@ -46,4 +46,32 @@ class CustodianController extends Controller
 
         return response()->json(Present::custodian($custodian->load('user:id,name,main_tier_user_id')));
     }
+
+    /**
+     * Auto-link every still-unlinked person-custodian to the Ecopa user whose
+     * email matches (case-insensitive). Returns the refreshed custodian list.
+     */
+    public function autoLink(): JsonResponse
+    {
+        $custodians = Custodian::query()
+            ->where('type', 'person')
+            ->whereNull('user_id')
+            ->whereNotNull('email')
+            ->get();
+
+        $linked = 0;
+        foreach ($custodians as $custodian) {
+            $user = User::query()->whereRaw('LOWER(email) = ?', [mb_strtolower((string) $custodian->email)])->first();
+            if ($user) {
+                $custodian->user_id = $user->id;
+                $custodian->save();
+                $linked++;
+            }
+        }
+
+        $all = Custodian::query()->with('user:id,name,main_tier_user_id')->orderBy('code')->get()
+            ->map(fn (Custodian $c) => Present::custodian($c));
+
+        return response()->json(['linked' => $linked, 'custodians' => $all]);
+    }
 }

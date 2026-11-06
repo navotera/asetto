@@ -10,6 +10,7 @@ use Akunta\Rbac\Models\Role;
 use Akunta\Rbac\Models\Tenant;
 use App\Exceptions\EcopaRegistrationException;
 use App\Http\Controllers\Controller;
+use App\Models\Custodian;
 use App\Models\EcopaWebhookReceipt;
 use App\Models\User;
 use App\Services\EcopaIntegrationService;
@@ -150,6 +151,14 @@ class EcopaWebhookController extends Controller
             'email_verified_at' => $user->email_verified_at ?? now(),
             'disabled_at' => null,
         ])->save();
+
+        // Auto-link an unlinked person-custodian with the same email so this user
+        // immediately sees their assets under "Aset Saya".
+        Custodian::query()
+            ->where('type', 'person')
+            ->whereNull('user_id')
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])
+            ->update(['user_id' => $user->id]);
 
         $app = $this->selfApp();
         $entityId = ! empty($subject['entity_id']) ? (string) $subject['entity_id'] : null;

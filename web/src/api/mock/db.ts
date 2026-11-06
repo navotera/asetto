@@ -103,8 +103,8 @@ const custodians: Custodian[] = [
   { id: 'cus_ops', type: 'entity', code: 'DEPT-OPS', name: 'Divisi Operasional' },
   { id: 'cus_it', type: 'entity', code: 'DEPT-IT', name: 'Divisi Teknologi' },
   { id: 'cus_fin', type: 'entity', code: 'DEPT-FIN', name: 'Divisi Keuangan' },
-  { id: 'cus_budi', type: 'person', code: 'EMP-0012', name: 'Budi Santoso', department: 'Operasional' },
-  { id: 'cus_sari', type: 'person', code: 'EMP-0048', name: 'Sari Wijaya', department: 'Teknologi' },
+  { id: 'cus_budi', type: 'person', code: 'EMP-0012', name: 'Budi Santoso', department: 'Operasional', email: 'budi@example.com' },
+  { id: 'cus_sari', type: 'person', code: 'EMP-0048', name: 'Sari Wijaya', department: 'Teknologi', email: 'sari@example.com' },
 ];
 
 function seedAsset(
@@ -1193,7 +1193,9 @@ export const db = {
       role_id: 'role_admin', role_code: 'admin', role_name: 'Admin',
       disabled_at: null, can_update_role: false, can_impersonate: false,
     }],
-    unassigned_users: [],
+    unassigned_users: syncedMembers
+      .filter((m) => m.user_id !== 'usr_1')
+      .map((m) => ({ assignment_id: `ua_${m.user_id}`, user_id: m.user_id, ecopa_user_id: m.user_id, name: m.name, email: m.email, can_impersonate: true })),
     roles: [
       { id: 'role_admin', code: 'admin', name: 'Admin' },
       { id: 'role_operator', code: 'operator', name: 'Operator' },
@@ -1221,6 +1223,19 @@ export const db = {
     const c = custodians.find((x) => x.id === custodianId) as any;
     if (c) c.user_id = userId || null;
     return c ?? { ok: true };
+  },
+
+  autoLinkCustodians() {
+    let linked = 0;
+    for (const c of custodians as any[]) {
+      if (c.type !== 'person' || c.user_id || !c.email) continue;
+      const member = syncedMembers.find((m) => m.email.toLowerCase() === String(c.email).toLowerCase());
+      if (member) {
+        c.user_id = member.user_id;
+        linked++;
+      }
+    }
+    return { linked, custodians };
   },
 
   // --- depreciation ---

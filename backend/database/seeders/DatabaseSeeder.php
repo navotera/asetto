@@ -58,8 +58,8 @@ class DatabaseSeeder extends Seeder
             ['id' => 'cus_ops', 'type' => 'entity', 'code' => 'DEPT-OPS', 'name' => 'Divisi Operasional'],
             ['id' => 'cus_it', 'type' => 'entity', 'code' => 'DEPT-IT', 'name' => 'Divisi Teknologi'],
             ['id' => 'cus_fin', 'type' => 'entity', 'code' => 'DEPT-FIN', 'name' => 'Divisi Keuangan'],
-            ['id' => 'cus_budi', 'type' => 'person', 'code' => 'EMP-0012', 'name' => 'Budi Santoso', 'department' => 'Operasional'],
-            ['id' => 'cus_sari', 'type' => 'person', 'code' => 'EMP-0048', 'name' => 'Sari Wijaya', 'department' => 'Teknologi'],
+            ['id' => 'cus_budi', 'type' => 'person', 'code' => 'EMP-0012', 'name' => 'Budi Santoso', 'department' => 'Operasional', 'email' => 'budi@example.com'],
+            ['id' => 'cus_sari', 'type' => 'person', 'code' => 'EMP-0048', 'name' => 'Sari Wijaya', 'department' => 'Teknologi', 'email' => 'sari@example.com'],
         ];
         foreach ($custodians as $c) {
             Custodian::query()->updateOrCreate(['id' => $c['id']], $c);
