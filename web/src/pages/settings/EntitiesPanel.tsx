@@ -63,19 +63,17 @@ function EntityUsersPage({ entity, onBack }: { entity: Entity; onBack: () => voi
 
   return (
     <Card>
-      <div className="flex items-center justify-between gap-3 border-b border-border-soft px-5 py-4">
+      <div className="flex items-start justify-between gap-3 border-b border-border-soft px-5 py-4">
         <div className="min-w-0">
-          <button onClick={onBack} className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+          <button onClick={onBack} className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
             ← Kembali ke Daftar Entitas
           </button>
-          <div className="flex items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-text-strong">{entity.name}</h3>
-            {entity.is_default && (
-              <span className="inline-flex items-center rounded-md bg-success-light px-2 py-0.5 text-xs font-semibold text-success">Default</span>
-            )}
-          </div>
+          <h3 className="truncate text-sm font-semibold text-text-strong">{entity.name}</h3>
           <p className="mt-0.5 font-mono text-xs text-text-muted">{entity.id}</p>
         </div>
+        {entity.is_default && (
+          <span className="mt-6 inline-flex shrink-0 items-center rounded-md bg-success-light px-2 py-0.5 text-xs font-semibold text-success">Default</span>
+        )}
       </div>
 
       {/* Tabs mirror the User & Roles screen. */}
