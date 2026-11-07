@@ -21,7 +21,7 @@ return [
         ['code' => 'disposal.manage', 'group' => 'Aset', 'label' => 'Pelepasan & penjualan aset'],
         ['code' => 'depreciation.run', 'group' => 'Depresiasi', 'label' => 'Jalankan & setujui depresiasi'],
         ['code' => 'journal.read', 'group' => 'Integrasi', 'label' => 'Lihat outbox jurnal Akunta'],
-        ['code' => 'settings.manage', 'group' => 'Pengaturan', 'label' => 'Kelola pengaturan, role, & custodian'],
+        ['code' => 'settings.manage', 'group' => 'Pengaturan', 'label' => 'Kelola pengaturan, role, & tim'],
     ],
 
     // code => { name, permissions: '*' (all, bypass) | string[] }

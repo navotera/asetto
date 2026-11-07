@@ -6,7 +6,6 @@ use Akunta\Rbac\Models\App as RbacApp;
 use Akunta\Rbac\Models\Role;
 use Akunta\Rbac\Models\UserAppAssignment;
 use App\Models\Asset;
-use App\Models\Custodian;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

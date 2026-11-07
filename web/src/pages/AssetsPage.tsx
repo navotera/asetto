@@ -4,7 +4,6 @@ import {
   useAssetsPaged,
   fetchAssetsFiltered,
   useCategories,
-  useCustodians,
   useEntities,
   useRestoreAsset,
   useCan,
@@ -44,7 +43,6 @@ type SortKey = 'code' | 'name' | 'category' | 'acquisition_date' | 'book_value' 
 
 export default function AssetsPage() {
   const { data: categories } = useCategories();
-  const { data: custodians } = useCustodians();
   const { data: entities } = useEntities();
   const { can } = useCan();
   const { activeEntityId } = useActiveEntity();
@@ -134,7 +132,7 @@ export default function AssetsPage() {
         return;
       }
       const { exportAssetsXlsx } = await import('@/lib/assetSheet');
-      exportAssetsXlsx(all, { categories: categories ?? [], custodians: custodians ?? [], entities: entities ?? [] });
+      exportAssetsXlsx(all, { categories: categories ?? [], entities: entities ?? [] });
       toast('success', `${all.length} aset diekspor.`);
     } catch (e) {
       toast('error', e instanceof Error ? e.message : 'Gagal mengekspor aset.');

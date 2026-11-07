@@ -3,7 +3,6 @@
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\BootstrapController;
 use App\Http\Controllers\Api\CategoryController;
-use App\Http\Controllers\Api\CustodianController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepreciationController;
 use App\Http\Controllers\Api\AssetImportController;
@@ -53,7 +52,6 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
     Route::middleware('perm:asset.read')->group(function () {
         Route::get('dashboard', [DashboardController::class, 'show']);
         Route::get('categories', [CategoryController::class, 'index']);
-        Route::get('custodians', [CustodianController::class, 'index']);
         Route::get('entities', [EntityController::class, 'index']);
         Route::get('entities/{entity}/responsibles', [EntityController::class, 'responsibles']);
         Route::get('assets', [AssetController::class, 'index']);
@@ -106,8 +104,6 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);
         Route::get('scheduler/health', [SchedulerHealthController::class, 'index']);
-        Route::post('custodians/auto-link', [CustodianController::class, 'autoLink']);
-        Route::patch('custodians/{custodian}', [CustodianController::class, 'link']);
         // Teams (per entity).
         Route::get('entities/{entity}/teams', [TeamController::class, 'index']);
         Route::post('entities/{entity}/teams', [TeamController::class, 'store']);

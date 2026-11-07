@@ -10,7 +10,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetAuditLog;
 use App\Models\AssetCategory;
-use App\Models\Custodian;
 use App\Models\CustodyHandover;
 use App\Models\JournalOutbox;
 use App\Models\Team;
@@ -43,7 +42,6 @@ class AssetController extends Controller
 
         $query = Asset::query()
             ->leftJoin('asset_categories', 'assets.category_id', '=', 'asset_categories.id')
-            ->leftJoin('custodians', 'assets.custodian_id', '=', 'custodians.id')
             ->with(['responsibleUser:id,name', 'responsibleTeam:id,name'])
             ->select('assets.*');
 
@@ -65,7 +63,6 @@ class AssetController extends Controller
         foreach ([
             'category_id' => 'assets.category_id',
             'condition' => 'assets.condition',
-            'custodian_id' => 'assets.custodian_id',
             'entity_id' => 'assets.entity_id',
         ] as $param => $column) {
             $value = trim((string) $request->query($param, ''));
@@ -97,7 +94,6 @@ class AssetController extends Controller
             'code' => 'assets.code',
             'name' => 'assets.name',
             'category' => 'asset_categories.name',
-            'custodian' => 'custodians.name',
             'acquisition_date' => 'assets.acquisition_date',
             'acquisition_cost' => 'assets.acquisition_cost',
             'condition' => 'assets.condition',
@@ -384,7 +380,7 @@ class AssetController extends Controller
     public function custodyHistory(Asset $asset): JsonResponse
     {
         $rows = $asset->custodyHandovers()
-            ->with(['fromCustodian:id,name', 'toCustodian:id,name', 'fromUser:id,name', 'toUser:id,name', 'fromTeam:id,name', 'toTeam:id,name'])
+            ->with(['fromUser:id,name', 'toUser:id,name', 'fromTeam:id,name', 'toTeam:id,name'])
             ->get()
             ->map(fn (CustodyHandover $h) => Present::custodyHandover($h));
 
@@ -420,7 +416,6 @@ class AssetController extends Controller
             'useful_life_months' => ['sometimes', 'integer', 'min:1'],
             'method' => ['sometimes', Rule::in(self::METHODS)],
             'condition' => ['sometimes', Rule::in(self::CONDITIONS)],
-            'custodian_id' => ['sometimes', 'nullable', 'string', 'exists:custodians,id'],
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'serial_number' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],

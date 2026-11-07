@@ -8,7 +8,6 @@ use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\AssetPhoto;
 use App\Models\AssetPurchase;
-use App\Models\Custodian;
 use App\Models\CustodyHandover;
 use App\Models\DepreciationLine;
 use App\Models\DepreciationRun;
@@ -79,21 +78,6 @@ class Present
     }
 
     /** @return array<string, mixed> */
-    public static function custodian(Custodian $c): array
-    {
-        return [
-            'id' => $c->id,
-            'type' => $c->type,
-            'code' => $c->code,
-            'name' => $c->name,
-            'email' => $c->email,
-            'department' => $c->department,
-            'user_id' => $c->user_id,
-            'ecopa_user_id' => $c->relationLoaded('user') ? $c->user?->main_tier_user_id : null,
-            'user_name' => $c->relationLoaded('user') ? $c->user?->name : null,
-        ];
-    }
-
     /** @return array<string, mixed> */
     public static function team(Team $t): array
     {
@@ -183,18 +167,10 @@ class Present
     /** @return array<string, mixed> */
     public static function custodyHandover(CustodyHandover $h): array
     {
-        // Unified labels across the responsible types (user / team / legacy custodian).
-        $fromName = $h->fromUser?->name ?? $h->fromTeam?->name ?? $h->fromCustodian?->name;
-        $toName = $h->toUser?->name ?? $h->toTeam?->name ?? $h->toCustodian?->name;
-
         return [
             'id' => $h->id,
-            'from_name' => $fromName,
-            'to_name' => $toName,
-            'from_custodian_id' => $h->from_custodian_id,
-            'from_custodian_name' => $h->fromCustodian?->name,
-            'to_custodian_id' => $h->to_custodian_id,
-            'to_custodian_name' => $h->toCustodian?->name,
+            'from_name' => $h->fromUser?->name ?? $h->fromTeam?->name,
+            'to_name' => $h->toUser?->name ?? $h->toTeam?->name,
             'from_location' => $h->from_location,
             'to_location' => $h->to_location,
             'condition_at_handover' => $h->condition_at_handover,

@@ -25,16 +25,6 @@ class CustodyHandover extends Model
         return $this->belongsTo(Asset::class, 'asset_id');
     }
 
-    public function fromCustodian(): BelongsTo
-    {
-        return $this->belongsTo(Custodian::class, 'from_custodian_id');
-    }
-
-    public function toCustodian(): BelongsTo
-    {
-        return $this->belongsTo(Custodian::class, 'to_custodian_id');
-    }
-
     public function fromUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'from_user_id');

@@ -3,7 +3,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button, Spinner, Badge } from '@/components/ui/primitives';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/toast';
-import { useCategories, useCustodians, useEntities, useImportAssets } from '@/api/queries';
+import { useCategories, useEntities, useImportAssets } from '@/api/queries';
 import { parseAssetFile, downloadTemplateXlsx, type RawRow, type ImportResult } from '@/lib/assetSheet';
 
 type Step = 'select' | 'preview' | 'done';
@@ -11,7 +11,6 @@ type Step = 'select' | 'preview' | 'done';
 export function ImportAssetsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toast = useToast();
   const { data: categories } = useCategories();
-  const { data: custodians } = useCustodians();
   const { data: entities } = useEntities();
   const importMut = useImportAssets();
 
@@ -37,7 +36,7 @@ export function ImportAssetsModal({ open, onClose }: { open: boolean; onClose: (
     onClose();
   }
 
-  const lookups = { categories: categories ?? [], custodians: custodians ?? [], entities: entities ?? [] };
+  const lookups = { categories: categories ?? [], entities: entities ?? [] };
 
   async function onPick(file: File | undefined) {
     if (!file) return;

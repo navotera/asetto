@@ -8,7 +8,6 @@ import type {
   AssetDepreciationEntry,
   AssetPhoto,
   AssetPurchase,
-  Custodian,
   CustodyHandover,
   DashboardSummary,
   DepreciationReport,
@@ -38,7 +37,6 @@ export const keys = {
   asset: (id: string) => ['assets', id] as const,
   categories: ['categories'] as const,
   entities: ['entities'] as const,
-  custodians: ['custodians'] as const,
   custodyHistory: (id: string) => ['assets', id, 'custody'] as const,
   assetAudit: (id: string) => ['assets', id, 'audit'] as const,
   assetPhotos: (id: string) => ['assets', id, 'photos'] as const,
@@ -136,22 +134,6 @@ export function useSaveRoleMatrix() {
   });
 }
 
-export function useLinkCustodian() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { custodian_id: string; user_id?: string | null; ecopa_user_id?: string | null }) =>
-      api.patch(`/custodians/${v.custodian_id}`, { user_id: v.user_id ?? null, ecopa_user_id: v.ecopa_user_id ?? null }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.custodians }),
-  });
-}
-
-export function useAutoLinkCustodians() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api.post<{ linked: number; custodians: Custodian[] }>('/custodians/auto-link', {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.custodians }),
-  });
-}
 
 export const useMyAssets = () =>
   useQuery({ queryKey: keys.myAssets, queryFn: () => api.get<MyAsset[]>('/assets/mine') });
@@ -170,7 +152,6 @@ export interface AssetListParams {
   /** Which list tab: active (default) | inactive (disposed) | trashed. */
   tab?: 'active' | 'inactive' | 'trashed';
   condition?: string;
-  custodian_id?: string;
   entity_id?: string;
   sort?: string;
   dir?: 'asc' | 'desc';
@@ -325,8 +306,6 @@ export function useTeamMutations(entityId: string) {
   return { create, rename, remove, addMember, removeMember };
 }
 
-export const useCustodians = () =>
-  useQuery({ queryKey: keys.custodians, queryFn: () => api.get<Custodian[]>('/custodians') });
 
 export function useSaveAsset() {
   const invalidate = useInvalidateAll();

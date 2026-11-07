@@ -36,7 +36,6 @@ function importRow(array $overrides = []): array
         'useful_life_months' => '48',
         'method' => 'Garis Lurus',
         'condition' => 'Baik',
-        'custodian' => 'DEPT-IT',
         'location' => 'Kantor Pusat',
         'serial_number' => 'EPS-001',
         'notes' => '',
@@ -60,7 +59,6 @@ it('previews rows without writing, resolving names and flagging bad rows', funct
         ->assertJsonPath('summary.invalid', 1)
         ->assertJsonPath('rows.0.valid', true)
         ->assertJsonPath('rows.0.resolved.category_id', 'cat_komputer')
-        ->assertJsonPath('rows.0.resolved.custodian_id', 'cus_it')
         ->assertJsonPath('rows.0.resolved.acquisition_cost', 7500000)
         ->assertJsonPath('rows.1.valid', false);
 

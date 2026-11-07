@@ -11,7 +11,6 @@
 import type {
   Asset,
   AssetCategory,
-  Custodian,
   DashboardSummary,
   DepreciationLine,
   DepreciationRun,
@@ -138,14 +137,6 @@ const categories: AssetCategory[] = [
   { id: 'cat_mesin', code: 'MSN', name: 'Mesin Produksi', default_method: 'straight_line', default_useful_life_months: 120 },
 ];
 
-const custodians: Custodian[] = [
-  { id: 'cus_ops', type: 'entity', code: 'DEPT-OPS', name: 'Divisi Operasional' },
-  { id: 'cus_it', type: 'entity', code: 'DEPT-IT', name: 'Divisi Teknologi' },
-  { id: 'cus_fin', type: 'entity', code: 'DEPT-FIN', name: 'Divisi Keuangan' },
-  { id: 'cus_budi', type: 'person', code: 'EMP-0012', name: 'Budi Santoso', department: 'Operasional', email: 'budi@example.com' },
-  { id: 'cus_sari', type: 'person', code: 'EMP-0048', name: 'Sari Wijaya', department: 'Teknologi', email: 'sari@example.com' },
-];
-
 function seedAsset(
   partial: Omit<Asset, 'accumulated_depreciation' | 'book_value' | 'status' | 'last_depreciated_period' | 'entity_id' | 'sync_akunta'> &
     Partial<Pick<Asset, 'accumulated_depreciation' | 'last_depreciated_period' | 'entity_id' | 'sync_akunta'>>,
@@ -174,7 +165,6 @@ const assets: Asset[] = [
     useful_life_months: 96,
     method: 'straight_line',
     condition: 'good',
-    custodian_id: 'cus_ops',
     location: 'Kantor Pusat — Jakarta',
     serial_number: 'VIN-AVZ-2023-0098',
     accumulated_depreciation: 72_000_000,
@@ -192,7 +182,6 @@ const assets: Asset[] = [
     useful_life_months: 48,
     method: 'declining_balance',
     condition: 'good',
-    custodian_id: 'cus_sari',
     location: 'Kantor Pusat — Jakarta',
     serial_number: 'C02-MBP-7781',
     accumulated_depreciation: 11_200_000,
@@ -209,7 +198,6 @@ const assets: Asset[] = [
     useful_life_months: 60,
     method: 'straight_line',
     condition: 'needs_repair',
-    custodian_id: 'cus_fin',
     location: 'Kantor Pusat — Lantai 3',
     accumulated_depreciation: 36_833_333,
     last_depreciated_period: '2026-10',
@@ -225,7 +213,6 @@ const assets: Asset[] = [
     useful_life_months: 120,
     method: 'straight_line',
     condition: 'good',
-    custodian_id: 'cus_ops',
     location: 'Pabrik — Bekasi',
     serial_number: 'CNC-1325-0442',
     accumulated_depreciation: 236_000_000,
@@ -243,7 +230,6 @@ const assets: Asset[] = [
     useful_life_months: 48,
     method: 'declining_balance',
     condition: 'good',
-    custodian_id: 'cus_it',
     location: 'Ruang Server — Jakarta',
     serial_number: 'DELL-R760-1180',
     accumulated_depreciation: 28_900_000,
@@ -260,7 +246,6 @@ const assets: Asset[] = [
     useful_life_months: 120,
     method: 'straight_line',
     condition: 'idle',
-    custodian_id: 'cus_ops',
     location: 'Gudang — Bekasi',
     accumulated_depreciation: 190_000_000,
     last_depreciated_period: '2026-10',
@@ -278,7 +263,6 @@ const DUMMY_CONDITIONS: Asset['condition'][] = ['good', 'good', 'good', 'needs_r
 for (let i = 0; i < 100; i++) {
   const n = i + 7;
   const cat = categories[i % categories.length];
-  const cust = custodians[i % custodians.length];
   const ent = entities[i % entities.length];
   const baseCost = 2_000_000 + (i % 25) * 1_500_000;
   const year = 2019 + (i % 7);
@@ -296,7 +280,6 @@ for (let i = 0; i < 100; i++) {
       useful_life_months: cat.default_useful_life_months,
       method: cat.default_method,
       condition: DUMMY_CONDITIONS[i % DUMMY_CONDITIONS.length],
-      custodian_id: cust.id,
       location: `Lokasi ${1 + (i % 5)}`,
       accumulated_depreciation: Math.round((baseCost * (i % 7)) / 10),
       last_depreciated_period: '2026-10',
@@ -376,7 +359,6 @@ let integration = {
   webhook_ready: false,
 };
 
-const custodianNameById = (id: string | null) => custodians.find((c) => c.id === id)?.name ?? null;
 
 const assetAudit: Record<string, any[]> = {};
 function auditPush(assetId: string, action: string, description: string) {
@@ -397,7 +379,7 @@ const PERMISSION_CATALOG = [
   { code: 'disposal.manage', group: 'Aset', label: 'Pelepasan & penjualan aset' },
   { code: 'depreciation.run', group: 'Depresiasi', label: 'Jalankan & setujui depresiasi' },
   { code: 'journal.read', group: 'Integrasi', label: 'Lihat outbox jurnal Akunta' },
-  { code: 'settings.manage', group: 'Pengaturan', label: 'Kelola pengaturan, role, & custodian' },
+  { code: 'settings.manage', group: 'Pengaturan', label: 'Kelola pengaturan, role, & tim' },
 ];
 const ALL_CODES = PERMISSION_CATALOG.map((p) => p.code);
 
@@ -743,16 +725,6 @@ function resolveImportRow(raw: Record<string, string>): { data: Record<string, a
   else if (CONDITION_IMPORT_LABELS[lc(conditionText)]) data.condition = CONDITION_IMPORT_LABELS[lc(conditionText)];
   else errors.push(`Kondisi "${conditionText}" tidak dikenal (Baik / Perlu Perbaikan / Rusak / Tidak Terpakai).`);
 
-  const custodianText = get('custodian');
-  if (!custodianText) data.custodian_id = null;
-  else {
-    const c = custodians.find(
-      (x) => x.id === custodianText || lc(x.code) === lc(custodianText) || lc(x.name) === lc(custodianText),
-    );
-    if (!c) errors.push(`Penanggung jawab "${custodianText}" tidak dikenal.`);
-    else data.custodian_id = c.id;
-  }
-
   data.location = get('location');
   data.serial_number = get('serial_number') || undefined;
   data.notes = get('notes') || undefined;
@@ -767,7 +739,6 @@ function resolveImportRow(raw: Record<string, string>): { data: Record<string, a
 export const db = {
   me: () => me,
   categories: () => categories.map((c) => ({ ...c, asset_count: assets.filter((a) => a.category_id === c.id).length })),
-  custodians: () => custodians,
   entities: () => entitiesWithCounts(),
   createEntity(input: { name?: string }): Entity {
     const name = input.name?.trim() || 'Entitas Baru';
@@ -908,7 +879,6 @@ export const db = {
     if (search) list = list.filter((a) => a.name.toLowerCase().includes(search) || a.code.toLowerCase().includes(search));
     if (params.category_id) list = list.filter((a) => a.category_id === params.category_id);
     if (params.condition) list = list.filter((a) => a.condition === params.condition);
-    if (params.custodian_id) list = list.filter((a) => (a.custodian_id ?? '') === params.custodian_id);
     if (params.entity_id) list = list.filter((a) => a.entity_id === params.entity_id);
 
     // Tab = active (default) | inactive (disposed) | trashed. Counts reflect the
@@ -927,7 +897,6 @@ export const db = {
       code: (a) => a.code,
       name: (a) => a.name.toLowerCase(),
       category: (a) => categoryName(a.category_id).toLowerCase(),
-      custodian: (a) => (custodianNameById(a.custodian_id) ?? '').toLowerCase(),
       acquisition_date: (a) => a.acquisition_date ?? '',
       acquisition_cost: (a) => a.acquisition_cost ?? 0,
       book_value: (a) => a.book_value ?? 0,
@@ -967,7 +936,6 @@ export const db = {
       useful_life_months: input.useful_life_months ?? 60,
       method: input.method || 'straight_line',
       condition: input.condition || 'good',
-      custodian_id: input.custodian_id ?? null,
       location: input.location || '—',
       serial_number: input.serial_number,
       notes: input.notes,
@@ -1013,7 +981,6 @@ export const db = {
         useful_life_months: d.useful_life_months,
         method: d.method,
         condition: d.condition,
-        custodian_id: d.custodian_id,
         location: d.location,
         serial_number: d.serial_number,
         notes: d.notes,
@@ -1289,24 +1256,6 @@ export const db = {
   saveRoleMatrix(roleCode: string, permissions: string[]) {
     if (rolePerms[roleCode]) rolePerms[roleCode] = permissions;
     return db.permissionMatrix();
-  },
-  linkCustodian(custodianId: string, userId: string | null) {
-    const c = custodians.find((x) => x.id === custodianId) as any;
-    if (c) c.user_id = userId || null;
-    return c ?? { ok: true };
-  },
-
-  autoLinkCustodians() {
-    let linked = 0;
-    for (const c of custodians as any[]) {
-      if (c.type !== 'person' || c.user_id || !c.email) continue;
-      const member = syncedMembers.find((m) => m.email.toLowerCase() === String(c.email).toLowerCase());
-      if (member) {
-        c.user_id = member.user_id;
-        linked++;
-      }
-    }
-    return { linked, custodians };
   },
 
   // --- depreciation ---

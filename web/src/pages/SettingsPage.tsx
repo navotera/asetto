@@ -6,7 +6,6 @@ import { cn } from '@/lib/cn';
 import { useToast } from '@/components/ui/toast';
 import { UserRolesPanel } from './settings/UserRolesPanel';
 import { RoleMatrixPanel } from './settings/RoleMatrixPanel';
-import { CustodianLinkPanel } from './settings/CustodianLinkPanel';
 import { EntitiesPanel } from './settings/EntitiesPanel';
 import { IntegrationPanel } from './settings/IntegrationPanel';
 import { SyncPanel } from './settings/SyncPanel';
@@ -39,7 +38,6 @@ const SECTIONS: Section[] = [
   { id: 'penyimpanan', label: 'Penyimpanan File', description: 'Disk foto & bukti', icon: '▤', adminOnly: true },
   { id: 'users', label: 'User & Roles', description: 'Assign role & impersonate', icon: '♙', adminOnly: true },
   { id: 'roles', label: 'Role Management', description: 'Matriks izin role', icon: '✓', adminOnly: true },
-  { id: 'custodian', label: 'Tautan Custodian', description: 'Custodian → user Ecopa', icon: '⇄', adminOnly: true },
   { id: 'integrasi', label: 'Integrasi', description: 'Ecopa & Akunta', icon: '⇆' },
 ];
 
@@ -146,7 +144,6 @@ export default function SettingsPage() {
           {current?.id === 'entitas' && <EntitiesPanel />}
           {current?.id === 'users' && <UserRolesPanel />}
           {current?.id === 'roles' && <RoleMatrixPanel />}
-          {current?.id === 'custodian' && <CustodianLinkPanel />}
 
           {current?.id === 'integrasi' && <IntegrationPanel />}
         </div>

@@ -41,11 +41,6 @@ class Asset extends Model
         return $this->belongsTo(AssetCategory::class, 'category_id');
     }
 
-    public function custodian(): BelongsTo
-    {
-        return $this->belongsTo(Custodian::class, 'custodian_id');
-    }
-
     public function responsibleUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responsible_user_id');

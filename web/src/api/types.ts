@@ -43,7 +43,6 @@ export interface SchedulerHealth {
 export type DepreciationMethod = 'straight_line' | 'declining_balance' | 'none';
 export type AssetCondition = 'good' | 'needs_repair' | 'broken' | 'idle';
 export type AssetStatus = 'active' | 'disposed';
-export type CustodianType = 'entity' | 'person';
 
 export interface AssetCategory {
   id: string;
@@ -112,18 +111,6 @@ export interface ResponsiblesData {
   teams: { id: string; name: string }[];
 }
 
-export interface Custodian {
-  id: string;
-  type: CustodianType;
-  code: string;
-  name: string;
-  email?: string | null;
-  department?: string | null;
-  user_id?: string | null;
-  ecopa_user_id?: string | null;
-  user_name?: string | null;
-}
-
 export interface Asset {
   id: string;
   code: string;
@@ -136,7 +123,6 @@ export interface Asset {
   useful_life_months: number;
   method: DepreciationMethod;
   condition: AssetCondition;
-  custodian_id: string | null;
   location: string;
   serial_number?: string;
   notes?: string;
@@ -340,13 +326,9 @@ export interface MyAsset {
 
 export interface CustodyHandover {
   id: string;
-  /** Unified responsible labels (user/team/legacy custodian). */
+  /** Responsible labels (user/team). */
   from_name: string | null;
   to_name: string | null;
-  from_custodian_id: string | null;
-  from_custodian_name: string | null;
-  to_custodian_id: string | null;
-  to_custodian_name: string | null;
   from_location: string | null;
   to_location: string | null;
   condition_at_handover: AssetCondition | null;

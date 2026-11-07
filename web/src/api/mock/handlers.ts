@@ -37,7 +37,6 @@ export function handle(method: string, rawPath: string, body: any): unknown {
     if (m === 'PATCH') return db.updateCategory(p.id, body);
     if (m === 'DELETE') return db.deleteCategory(p.id);
   }
-  if (m === 'GET' && path === '/custodians') return db.custodians();
   if (m === 'GET' && path === '/entities') return db.entities();
   if (m === 'POST' && path === '/entities') return db.createEntity(body);
   if ((p = match(path, '/entities/:id/default')) && m === 'POST') return db.setDefaultEntity(p.id);
@@ -122,8 +121,6 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if ((p = match(path, '/role-management/:id')) && m === 'PATCH') return db.updateAssignment();
   if (m === 'GET' && path === '/permission-matrix') return db.permissionMatrix();
   if ((p = match(path, '/permission-matrix/:roleCode')) && m === 'PUT') return db.saveRoleMatrix(p.roleCode, body.permissions ?? []);
-  if (m === 'POST' && path === '/custodians/auto-link') return db.autoLinkCustodians();
-  if ((p = match(path, '/custodians/:id')) && m === 'PATCH') return db.linkCustodian(p.id, body.user_id ?? null);
 
   throw new ApiMockError(404, `Mock route tidak ada: ${m} ${path}`);
 }

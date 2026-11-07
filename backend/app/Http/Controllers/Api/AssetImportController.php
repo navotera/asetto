@@ -8,7 +8,6 @@ use Akunta\Rbac\Models\Entity;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetCategory;
-use App\Models\Custodian;
 use App\Support\AssetAudit;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -61,7 +60,6 @@ class AssetImportController extends Controller
 
         $entities = Entity::query()->get();
         $categories = AssetCategory::query()->get();
-        $custodians = Custodian::query()->get();
 
         // Codes already taken, so we can flag duplicates (in the DB and within
         // the uploaded batch itself).
@@ -71,7 +69,7 @@ class AssetImportController extends Controller
         $results = [];
         foreach (array_values($rows) as $i => $raw) {
             $raw = is_array($raw) ? $raw : [];
-            [$data, $errors] = $this->resolveRow($raw, $entities, $categories, $custodians);
+            [$data, $errors] = $this->resolveRow($raw, $entities, $categories);
 
             // Code uniqueness (only when a code was supplied; blank codes are
             // auto-generated at commit time and never collide).
@@ -140,10 +138,9 @@ class AssetImportController extends Controller
      * @param  array<string, mixed>  $raw
      * @param  Collection<int, Entity>  $entities
      * @param  Collection<int, AssetCategory>  $categories
-     * @param  Collection<int, Custodian>  $custodians
      * @return array{0: array<string, mixed>, 1: array<int, string>}
      */
-    private function resolveRow(array $raw, Collection $entities, Collection $categories, Collection $custodians): array
+    private function resolveRow(array $raw, Collection $entities, Collection $categories): array
     {
         $errors = [];
         $data = [];
@@ -259,21 +256,6 @@ class AssetImportController extends Controller
             $data['condition'] = $c;
         } else {
             $errors[] = "Kondisi \"{$conditionText}\" tidak dikenal (Baik / Perlu Perbaikan / Rusak / Tidak Terpakai).";
-        }
-
-        // custodian (optional) — match by code or name
-        $custodianText = $get('custodian');
-        if ($custodianText === '') {
-            $data['custodian_id'] = null;
-        } else {
-            $custodian = $custodians->first(fn (Custodian $c) => $c->id === $custodianText
-                || mb_strtolower((string) $c->code) === mb_strtolower($custodianText)
-                || mb_strtolower($c->name) === mb_strtolower($custodianText));
-            if (! $custodian) {
-                $errors[] = "Penanggung jawab \"{$custodianText}\" tidak dikenal.";
-            } else {
-                $data['custodian_id'] = $custodian->id;
-            }
         }
 
         $data['location'] = $get('location');

@@ -9,7 +9,7 @@
  * them back to ids.
  */
 import * as XLSX from 'xlsx';
-import type { Asset, AssetCategory, Custodian, Entity, DepreciationMethod, AssetCondition } from '@/api/types';
+import type { Asset, AssetCategory, Entity, DepreciationMethod, AssetCondition } from '@/api/types';
 
 export interface SheetColumn {
   header: string;
@@ -28,7 +28,6 @@ export const ASSET_COLUMNS: SheetColumn[] = [
   { header: 'Masa Manfaat (bln)', key: 'useful_life_months' },
   { header: 'Metode Depresiasi', key: 'method' },
   { header: 'Kondisi', key: 'condition' },
-  { header: 'Penanggung Jawab', key: 'custodian' },
   { header: 'Lokasi', key: 'location' },
   { header: 'Nomor Seri', key: 'serial_number' },
   { header: 'Catatan', key: 'notes' },
@@ -51,7 +50,6 @@ export type RawRow = Record<string, string>;
 
 interface Lookups {
   categories: AssetCategory[];
-  custodians: Custodian[];
   entities: Entity[];
 }
 
@@ -84,7 +82,6 @@ function headerKeyMap(): Record<string, string> {
 function assetToRow(asset: Asset, lk: Lookups): (string | number)[] {
   const entity = lk.entities.find((e) => e.id === asset.entity_id);
   const category = lk.categories.find((c) => c.id === asset.category_id);
-  const custodian = lk.custodians.find((c) => c.id === asset.custodian_id);
   const money = (v: number | null | undefined) => (v === null || v === undefined ? '' : v);
 
   return [
@@ -98,7 +95,6 @@ function assetToRow(asset: Asset, lk: Lookups): (string | number)[] {
     asset.useful_life_months,
     METHOD_EXPORT_LABELS[asset.method] ?? asset.method,
     CONDITION_EXPORT_LABELS[asset.condition] ?? asset.condition,
-    custodian?.name ?? '',
     asset.location ?? '',
     asset.serial_number ?? '',
     asset.notes ?? '',
@@ -113,9 +109,6 @@ function referenceSheet(lk: Lookups): XLSX.WorkSheet {
   rows.push([]);
   rows.push(['Kategori (kode — nama)']);
   for (const c of lk.categories) rows.push([`${c.code} — ${c.name}`]);
-  rows.push([]);
-  rows.push(['Penanggung Jawab (kode — nama)']);
-  for (const c of lk.custodians) rows.push([`${c.code} — ${c.name}`]);
   rows.push([]);
   rows.push(['Metode Depresiasi', ...Object.values(METHOD_EXPORT_LABELS)]);
   rows.push(['Kondisi', ...Object.values(CONDITION_EXPORT_LABELS)]);
@@ -144,7 +137,6 @@ export function exportAssetsXlsx(assets: Asset[], lk: Lookups, filename?: string
 export function downloadTemplateXlsx(lk: Lookups): void {
   const exampleEntity = lk.entities[0]?.name ?? 'PT Contoh';
   const exampleCategory = lk.categories[0]?.code ?? 'KMP';
-  const exampleCustodian = lk.custodians[0]?.code ?? '';
   const example: (string | number)[] = [
     '', // Kode — biarkan kosong agar dibuat otomatis
     'Contoh: Laptop Dell Latitude',
@@ -156,7 +148,6 @@ export function downloadTemplateXlsx(lk: Lookups): void {
     48,
     'Garis Lurus',
     'Baik',
-    exampleCustodian,
     'Kantor Pusat — Lantai 3',
     'SN-CONTOH-001',
     '',
