@@ -1,10 +1,37 @@
-import { useSchedulerHealth } from '@/api/queries';
-import { Card, CardHeader, Badge, LoadingBlock } from '@/components/ui/primitives';
+import { useEffect, useState } from 'react';
+import { useSchedulerHealth, useSettings, useSaveSettings } from '@/api/queries';
+import { Card, CardHeader, Badge, LoadingBlock, Field, Input, Button, Spinner } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
+import type { RetentionSettings } from '@/api/types';
 
 export function CronPanel() {
   const { data, isLoading } = useSchedulerHealth(true);
+  const { data: settings } = useSettings();
+  const save = useSaveSettings();
   const toast = useToast();
+
+  const [trashedMonths, setTrashedMonths] = useState('3');
+  const [acceptedYears, setAcceptedYears] = useState('2');
+
+  useEffect(() => {
+    if (settings?.retention) {
+      setTrashedMonths(String(settings.retention.trashed_months));
+      setAcceptedYears(String(settings.retention.accepted_years));
+    }
+  }, [settings]);
+
+  async function saveRetention() {
+    const retention: RetentionSettings = {
+      trashed_months: Math.max(0, Number(trashedMonths) || 0),
+      accepted_years: Math.max(0, Number(acceptedYears) || 0),
+    };
+    try {
+      await save.mutateAsync({ retention });
+      toast('success', 'Retensi disimpan.');
+    } catch {
+      toast('error', 'Gagal menyimpan retensi.');
+    }
+  }
 
   if (isLoading || !data) {
     return (
@@ -66,6 +93,26 @@ export function CronPanel() {
             <span className="shrink-0 text-xs text-text-muted">{t.schedule}</span>
           </div>
         ))}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Retensi antrean"
+          subtitle="Pembersihan otomatis antrean oleh cron. Nilai 0 = jangan hapus otomatis."
+        />
+        <div className="flex flex-col gap-4 px-5 py-4">
+          <Field label="Hapus item Trashed setelah (bulan)" hint="Antrean yang dibuang dihapus permanen setelah masa ini.">
+            <Input type="number" min={0} value={trashedMonths} onChange={(e) => setTrashedMonths(e.target.value)} />
+          </Field>
+          <Field label="Hapus item Berhasil setelah (tahun)" hint="Riwayat yang sudah berhasil dihapus setelah masa ini.">
+            <Input type="number" min={0} value={acceptedYears} onChange={(e) => setAcceptedYears(e.target.value)} />
+          </Field>
+          <div>
+            <Button onClick={saveRetention} disabled={save.isPending}>
+              {save.isPending && <Spinner />} Simpan retensi
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );
