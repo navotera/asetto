@@ -21,7 +21,9 @@ Akunta sebagai proses akhir akuntansi.
 - CRUD aset perusahaan
 - Depresiasi aset dengan penentuan metode depresiasi
 - Monitor kondisi aset
-- Pelimpahan tanggung jawab penggunaan aset (ke entitas kantor atau personil)
+- Pelimpahan tanggung jawab penggunaan aset (ke user atau Team per-entitas)
+- Manajemen user per-entitas (diaktifkan admin dari user yang di-assign Ecopa) +
+  Team per-entitas sebagai grup user / penanggung jawab aset
 - Penghapusan / penjualan aset
 - Fitur lain terkait
 
@@ -184,8 +186,8 @@ Urutan yang disarankan. Konfirmasi keputusan §4 dulu.
 4. First-access registration wizard + endpoint `/webhooks/ecopa` (approval +
    lifecycle user, idempotent, signature verify).
 5. Shadow user + model assignment + RBAC lokal (role rinci aset).
-6. Domain: migrasi & model aset, metode depresiasi, kondisi, custodian
-   (entitas/personil), pelepasan/penjualan.
+6. Domain: migrasi & model aset, metode depresiasi, kondisi, penanggung jawab
+   aset (user atau Team per-entitas — bukan lagi custodian), pelepasan/penjualan.
 7. Integrasi posting jurnal ke Akunta via `api-client` (depresiasi, disposal).
 8. Frontend (bila perlu SPA terpisah — ikuti pola `accounting-web`/`poso-web`).
 9. Test: SSO flow, webhook idempotency (pakai `Http::fake()`), otorisasi
