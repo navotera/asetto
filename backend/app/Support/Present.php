@@ -14,6 +14,7 @@ use App\Models\DepreciationLine;
 use App\Models\DepreciationRun;
 use App\Models\Disposal;
 use App\Models\JournalOutbox;
+use App\Models\Team;
 
 /**
  * Serializers that produce exactly the JSON shapes the SPA's TypeScript types
@@ -84,6 +85,20 @@ class Present
             'user_id' => $c->user_id,
             'ecopa_user_id' => $c->relationLoaded('user') ? $c->user?->main_tier_user_id : null,
             'user_name' => $c->relationLoaded('user') ? $c->user?->name : null,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function team(Team $t): array
+    {
+        return [
+            'id' => $t->id,
+            'entity_id' => $t->entity_id,
+            'name' => $t->name,
+            'member_count' => $t->relationLoaded('members') ? $t->members->count() : $t->members()->count(),
+            'members' => $t->relationLoaded('members')
+                ? $t->members->map(fn ($u) => ['user_id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values()->all()
+                : [],
         ];
     }
 

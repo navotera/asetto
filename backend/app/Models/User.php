@@ -7,6 +7,7 @@ namespace App\Models;
 use Akunta\Rbac\Models\Entity;
 use Akunta\Rbac\Models\User as RbacUser;
 use Akunta\Rbac\Models\UserAppAssignment;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -23,6 +24,12 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends RbacUser
 {
     use HasApiTokens;
+
+    /** Teams this user belongs to (per-entity groups). */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_user', 'user_id', 'team_id')->withTimestamps();
+    }
 
     /** Entities this user may act within. Admins = all; others = entities an
      *  admin explicitly assigned them to (per-entity assignments). A plain

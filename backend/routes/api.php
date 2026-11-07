@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\RoleManagementController;
 use App\Http\Controllers\Api\SchedulerHealthController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\TeamController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -106,6 +107,13 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('scheduler/health', [SchedulerHealthController::class, 'index']);
         Route::post('custodians/auto-link', [CustodianController::class, 'autoLink']);
         Route::patch('custodians/{custodian}', [CustodianController::class, 'link']);
+        // Teams (per entity).
+        Route::get('entities/{entity}/teams', [TeamController::class, 'index']);
+        Route::post('entities/{entity}/teams', [TeamController::class, 'store']);
+        Route::patch('teams/{team}', [TeamController::class, 'update']);
+        Route::delete('teams/{team}', [TeamController::class, 'destroy']);
+        Route::post('teams/{team}/members', [TeamController::class, 'addMember']);
+        Route::delete('teams/{team}/members/{user}', [TeamController::class, 'removeMember']);
         Route::post('entities', [EntityController::class, 'store']);
         Route::patch('entities/{entity}', [EntityController::class, 'setEnabled']);
         Route::post('entities/{entity}/default', [EntityController::class, 'setDefault']);

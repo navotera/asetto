@@ -77,6 +77,27 @@ const entityUsers: Record<string, { assignment_id: string; user_id: string; role
 const entitiesWithCounts = () =>
   entities.map((e) => ({ ...e, user_count: (entityUsers[e.id] ?? []).length }));
 
+// Per-entity teams (group of users); members are user ids.
+const teams: { id: string; entity_id: string; name: string; members: string[] }[] = [
+  { id: 'team_ops', entity_id: 'ent_asetto_nusantara', name: 'Tim Operasional', members: ['usr_2'] },
+];
+const presentTeam = (t: (typeof teams)[number]) => {
+  const members = t.members.map((uid) => {
+    const m = syncedMembers.find((s) => s.user_id === uid);
+    return { user_id: uid, name: m?.name ?? uid, email: m?.email ?? null };
+  });
+  return { id: t.id, entity_id: t.entity_id, name: t.name, member_count: members.length, members };
+};
+const entityActiveUsers = (entityId: string) =>
+  (entityUsers[entityId] ?? []).map((a) => {
+    const m = syncedMembers.find((s) => s.user_id === a.user_id);
+    return { user_id: a.user_id, name: m?.name ?? a.user_id, email: m?.email ?? null };
+  });
+const entityTeamsData = (entityId: string) => ({
+  teams: teams.filter((t) => t.entity_id === entityId).map(presentTeam),
+  entity_users: entityActiveUsers(entityId),
+});
+
 /** Readable, unique entity id derived from the name — mirrors the backend. */
 function entitySlugId(name: string): string {
   const base = name
@@ -769,6 +790,35 @@ export const db = {
   unassignEntityUser(entityId: string, userId: string) {
     entityUsers[entityId] = (entityUsers[entityId] ?? []).filter((a) => a.user_id !== userId);
     return db.entityUsersList(entityId);
+  },
+
+  // --- teams ---
+  entityTeams: (entityId: string) => entityTeamsData(entityId),
+  createTeam(entityId: string, name: string) {
+    teams.push({ id: id('team'), entity_id: entityId, name: String(name || 'Team Baru').trim() || 'Team Baru', members: [] });
+    return entityTeamsData(entityId);
+  },
+  renameTeam(teamId: string, name: string) {
+    const t = teams.find((x) => x.id === teamId);
+    if (t) t.name = String(name || t.name).trim() || t.name;
+    return entityTeamsData(t?.entity_id ?? '');
+  },
+  deleteTeam(teamId: string) {
+    const t = teams.find((x) => x.id === teamId);
+    const eid = t?.entity_id ?? '';
+    const i = teams.findIndex((x) => x.id === teamId);
+    if (i >= 0) teams.splice(i, 1);
+    return entityTeamsData(eid);
+  },
+  addTeamMember(teamId: string, userId: string) {
+    const t = teams.find((x) => x.id === teamId);
+    if (t && userId && !t.members.includes(userId)) t.members.push(userId);
+    return entityTeamsData(t?.entity_id ?? '');
+  },
+  removeTeamMember(teamId: string, userId: string) {
+    const t = teams.find((x) => x.id === teamId);
+    if (t) t.members = t.members.filter((u) => u !== userId);
+    return entityTeamsData(t?.entity_id ?? '');
   },
 
   setEntityEnabled(entityId: string, enabled: boolean): Entity[] {

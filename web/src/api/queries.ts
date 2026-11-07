@@ -18,6 +18,7 @@ import type {
   DisposalType,
   Entity,
   EntityUsersData,
+  EntityTeamsData,
   JournalEntry,
   Me,
   MyAsset,
@@ -279,6 +280,40 @@ export function useUnassignEntityUser(entityId: string) {
       qc.invalidateQueries({ queryKey: keys.entities });
     },
   });
+}
+
+// --- Teams (per entity) ---
+export const useEntityTeams = (entityId: string | null) =>
+  useQuery({
+    queryKey: ['entities', entityId, 'teams'] as const,
+    queryFn: () => api.get<EntityTeamsData>(`/entities/${entityId}/teams`),
+    enabled: !!entityId,
+  });
+
+export function useTeamMutations(entityId: string) {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['entities', entityId, 'teams'] });
+  const create = useMutation({
+    mutationFn: (name: string) => api.post<EntityTeamsData>(`/entities/${entityId}/teams`, { name }),
+    onSuccess: invalidate,
+  });
+  const rename = useMutation({
+    mutationFn: (v: { id: string; name: string }) => api.patch<EntityTeamsData>(`/teams/${v.id}`, { name: v.name }),
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.del(`/teams/${id}`),
+    onSuccess: invalidate,
+  });
+  const addMember = useMutation({
+    mutationFn: (v: { teamId: string; userId: string }) => api.post<EntityTeamsData>(`/teams/${v.teamId}/members`, { user_id: v.userId }),
+    onSuccess: invalidate,
+  });
+  const removeMember = useMutation({
+    mutationFn: (v: { teamId: string; userId: string }) => api.del(`/teams/${v.teamId}/members/${v.userId}`),
+    onSuccess: invalidate,
+  });
+  return { create, rename, remove, addMember, removeMember };
 }
 
 export const useCustodians = () =>

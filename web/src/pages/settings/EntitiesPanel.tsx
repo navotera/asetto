@@ -12,6 +12,7 @@ import { Card, CardHeader, Button, LoadingBlock, EmptyState, Toggle, Select, Bad
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/toast';
 import { EntityFormModal } from '@/pages/EntityFormModal';
+import { EntityTeams } from './EntityTeams';
 import type { Entity } from '@/api/types';
 
 /**
@@ -24,7 +25,7 @@ function EntityUsersPage({ entity, onBack }: { entity: Entity; onBack: () => voi
   const unassign = useUnassignEntityUser(entity.id);
   const toast = useToast();
 
-  const [tab, setTab] = useState<'assigned' | 'available'>('assigned');
+  const [tab, setTab] = useState<'assigned' | 'available' | 'teams'>('assigned');
   const [availableRole, setAvailableRole] = useState<Record<string, string>>({});
 
   const roles = data?.roles ?? [];
@@ -78,7 +79,7 @@ function EntityUsersPage({ entity, onBack }: { entity: Entity; onBack: () => voi
 
       {/* Tabs mirror the User & Roles screen. */}
       <div className="flex gap-1 border-b border-border-soft px-5 pt-3">
-        {([['assigned', `Assigned (${assigned.length})`], ['available', `Available (${assignable.length})`]] as const).map(([key, label]) => (
+        {([['assigned', `Assigned (${assigned.length})`], ['available', `Available (${assignable.length})`], ['teams', 'Teams']] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -89,7 +90,9 @@ function EntityUsersPage({ entity, onBack }: { entity: Entity; onBack: () => voi
         ))}
       </div>
 
-      {isLoading ? (
+      {tab === 'teams' ? (
+        <EntityTeams entityId={entity.id} />
+      ) : isLoading ? (
         <LoadingBlock />
       ) : tab === 'assigned' ? (
         assigned.length === 0 ? (

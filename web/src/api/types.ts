@@ -92,6 +92,20 @@ export interface EntityUsersData {
   roles: { id: string; code: string; name: string }[];
 }
 
+/** A per-entity team (group of users). */
+export interface Team {
+  id: string;
+  entity_id: string;
+  name: string;
+  member_count: number;
+  members: { user_id: string; name: string | null; email: string | null }[];
+}
+
+export interface EntityTeamsData {
+  teams: Team[];
+  entity_users: AssignableUser[];
+}
+
 export interface Custodian {
   id: string;
   type: CustodianType;
