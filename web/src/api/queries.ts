@@ -19,6 +19,7 @@ import type {
   Entity,
   EntityUsersData,
   EntityTeamsData,
+  ResponsiblesData,
   JournalEntry,
   Me,
   MyAsset,
@@ -282,6 +283,14 @@ export function useUnassignEntityUser(entityId: string) {
   });
 }
 
+/** Responsible-party candidates (active users + teams) for an entity. */
+export const useEntityResponsibles = (entityId: string | null) =>
+  useQuery({
+    queryKey: ['entities', entityId, 'responsibles'] as const,
+    queryFn: () => api.get<ResponsiblesData>(`/entities/${entityId}/responsibles`),
+    enabled: !!entityId,
+  });
+
 // --- Teams (per entity) ---
 export const useEntityTeams = (entityId: string | null) =>
   useQuery({
@@ -322,7 +331,7 @@ export const useCustodians = () =>
 export function useSaveAsset() {
   const invalidate = useInvalidateAll();
   return useMutation({
-    mutationFn: (input: Partial<Asset> & { id?: string }) =>
+    mutationFn: (input: Partial<Asset> & { id?: string; responsible_type?: 'user' | 'team' | null; responsible_id?: string | null }) =>
       input.id ? api.patch<Asset>(`/assets/${input.id}`, input) : api.post<Asset>('/assets', input),
     onSuccess: invalidate,
   });
@@ -363,7 +372,8 @@ export function useReassign() {
   return useMutation({
     mutationFn: (v: {
       id: string;
-      custodian_id: string | null;
+      responsible_type: 'user' | 'team' | null;
+      responsible_id: string | null;
       location?: string;
       condition_at_handover?: Asset['condition'];
       notes?: string;

@@ -34,4 +34,24 @@ class CustodyHandover extends Model
     {
         return $this->belongsTo(Custodian::class, 'to_custodian_id');
     }
+
+    public function fromUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'from_user_id');
+    }
+
+    public function toUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'to_user_id');
+    }
+
+    public function fromTeam(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'from_team_id');
+    }
+
+    public function toTeam(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'to_team_id');
+    }
 }

@@ -90,13 +90,18 @@ it('blocks deleting a depreciated asset', function () {
         ->assertJsonPath('message', 'Aset sudah terdepresiasi — gunakan pelepasan, bukan hapus.');
 });
 
-it('reassigns an asset custodian + location', function () {
-    $id = Asset::where('code', 'AST-0002')->value('id');
+it('reassigns an asset to a team (responsible)', function () {
+    $asset = Asset::where('code', 'AST-0002')->first();
+    $team = \App\Models\Team::query()->create(['entity_id' => $asset->entity_id, 'name' => 'Tim Server']);
 
-    $this->postJson("/api/assets/{$id}/reassign", [
-        'custodian_id' => 'cus_it',
+    $this->postJson("/api/assets/{$asset->id}/reassign", [
+        'responsible_type' => 'team',
+        'responsible_id' => $team->id,
         'location' => 'Ruang Server — Jakarta',
-    ])->assertOk()->assertJsonPath('custodian_id', 'cus_it');
+    ])->assertOk()
+        ->assertJsonPath('responsible_type', 'team')
+        ->assertJsonPath('responsible_team_id', $team->id)
+        ->assertJsonPath('responsible_name', 'Tim Server');
 });
 
 it('updates an asset condition', function () {

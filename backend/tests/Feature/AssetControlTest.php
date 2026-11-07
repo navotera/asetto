@@ -27,8 +27,12 @@ beforeEach(function () {
 });
 
 it('records custody handover with condition when reassigning', function () {
+    $asset = Asset::whereKey($this->assetId)->first();
+    $team = \App\Models\Team::query()->create(['entity_id' => $asset->entity_id, 'name' => 'Tim IT']);
+
     $this->postJson("/api/assets/{$this->assetId}/reassign", [
-        'custodian_id' => 'cus_it',
+        'responsible_type' => 'team',
+        'responsible_id' => $team->id,
         'location' => 'Ruang Server',
         'condition_at_handover' => 'needs_repair',
         'notes' => 'Kipas berisik',
@@ -38,7 +42,7 @@ it('records custody handover with condition when reassigning', function () {
         ->assertOk()
         ->assertJsonCount(1)
         ->assertJsonPath('0.condition_at_handover', 'needs_repair')
-        ->assertJsonPath('0.to_custodian_id', 'cus_it')
+        ->assertJsonPath('0.to_name', 'Tim IT')
         ->assertJsonPath('0.notes', 'Kipas berisik');
 });
 

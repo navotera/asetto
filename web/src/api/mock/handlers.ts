@@ -44,6 +44,7 @@ export function handle(method: string, rawPath: string, body: any): unknown {
   if ((p = match(path, '/entities/:id/users/:uid')) && m === 'DELETE') return db.unassignEntityUser(p.id, p.uid);
   if ((p = match(path, '/entities/:id/users')) && m === 'GET') return db.entityUsersList(p.id);
   if ((p = match(path, '/entities/:id/users')) && m === 'POST') return db.assignEntityUser(p.id, body.user_id, body.role_id);
+  if ((p = match(path, '/entities/:id/responsibles')) && m === 'GET') return db.entityResponsibles(p.id);
   if ((p = match(path, '/entities/:id/teams')) && m === 'GET') return db.entityTeams(p.id);
   if ((p = match(path, '/entities/:id/teams')) && m === 'POST') return db.createTeam(p.id, body.name);
   if ((p = match(path, '/teams/:id/members/:uid')) && m === 'DELETE') return db.removeTeamMember(p.id, p.uid);

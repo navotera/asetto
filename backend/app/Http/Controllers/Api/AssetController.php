@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use Akunta\Rbac\Models\App as RbacApp;
+use Akunta\Rbac\Models\UserAppAssignment;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetAuditLog;
@@ -11,6 +13,7 @@ use App\Models\AssetCategory;
 use App\Models\Custodian;
 use App\Models\CustodyHandover;
 use App\Models\JournalOutbox;
+use App\Models\Team;
 use App\Models\User;
 use App\Support\AssetAudit;
 use App\Support\Present;
@@ -41,6 +44,7 @@ class AssetController extends Controller
         $query = Asset::query()
             ->leftJoin('asset_categories', 'assets.category_id', '=', 'asset_categories.id')
             ->leftJoin('custodians', 'assets.custodian_id', '=', 'custodians.id')
+            ->with(['responsibleUser:id,name', 'responsibleTeam:id,name'])
             ->select('assets.*');
 
         // Entity scoping: non-admins only see assets of entities assigned to them.
@@ -130,6 +134,7 @@ class AssetController extends Controller
     public function show(Request $request, Asset $asset): JsonResponse
     {
         $this->authorizeEntity($asset);
+        $asset->loadMissing(['responsibleUser:id,name', 'responsibleTeam:id,name']);
         $withValues = (bool) $request->user()?->hasPermission('asset.view_value');
 
         return response()->json(Present::asset($asset, $withValues));
@@ -147,16 +152,22 @@ class AssetController extends Controller
         );
     }
 
-    /** Assets delegated to the current user (custodian linked to them), without values. */
+    /** Assets this user is responsible for — directly, or via a team they're in. */
     public function mine(Request $request): JsonResponse
     {
-        $custodianIds = Custodian::query()
-            ->where('user_id', $request->user()?->id)
-            ->pluck('id');
+        /** @var User|null $user */
+        $user = $request->user();
+        $userId = $user?->id;
+        $teamIds = $user ? $user->teams()->pluck('teams.id') : collect();
 
         $assets = Asset::query()
             ->with('category:id,name')
-            ->whereIn('custodian_id', $custodianIds)
+            ->where(function ($q) use ($userId, $teamIds) {
+                $q->where('responsible_user_id', $userId);
+                if ($teamIds->isNotEmpty()) {
+                    $q->orWhereIn('responsible_team_id', $teamIds);
+                }
+            })
             ->orderBy('code')
             ->get()
             ->map(fn (Asset $a) => [
@@ -188,21 +199,59 @@ class AssetController extends Controller
         $data['status'] = 'active';
         $data['accumulated_depreciation'] = 0;
         $data['sync_akunta'] ??= true;
+        unset($data['responsible_type'], $data['responsible_id']);
 
         $asset = Asset::query()->create($data);
+        if ($request->has('responsible_type')) {
+            $this->applyResponsible($asset, $request->input('responsible_type'), $request->input('responsible_id'));
+        }
         AssetAudit::log($asset->id, 'created', 'Aset dibuat.');
 
-        return response()->json(Present::asset($asset), 201);
+        return response()->json(Present::asset($asset->load(['responsibleUser:id,name', 'responsibleTeam:id,name'])), 201);
     }
 
     public function update(Request $request, Asset $asset): JsonResponse
     {
         $this->authorizeEntity($asset);
         $data = $this->validatePayload($request, creating: false);
+        unset($data['responsible_type'], $data['responsible_id']);
         $asset->fill($data)->save();
+        if ($request->has('responsible_type')) {
+            $this->applyResponsible($asset, $request->input('responsible_type'), $request->input('responsible_id'));
+        }
         AssetAudit::log($asset->id, 'updated', 'Data aset diperbarui.');
 
-        return response()->json(Present::asset($asset->refresh()));
+        return response()->json(Present::asset($asset->refresh()->load(['responsibleUser:id,name', 'responsibleTeam:id,name'])));
+    }
+
+    /** Set the asset's responsible party (user or team) within its entity. */
+    private function applyResponsible(Asset $asset, ?string $type, ?string $id): void
+    {
+        if ($type === 'user' && $id) {
+            abort_unless($this->userActiveInEntity($id, (string) $asset->entity_id), 422, 'User bukan anggota aktif entitas aset.');
+            $asset->responsible_user_id = $id;
+            $asset->responsible_team_id = null;
+        } elseif ($type === 'team' && $id) {
+            abort_unless(Team::query()->whereKey($id)->where('entity_id', $asset->entity_id)->exists(), 422, 'Team bukan milik entitas aset.');
+            $asset->responsible_team_id = $id;
+            $asset->responsible_user_id = null;
+        } else {
+            $asset->responsible_user_id = null;
+            $asset->responsible_team_id = null;
+        }
+        $asset->save();
+    }
+
+    private function userActiveInEntity(string $userId, string $entityId): bool
+    {
+        $appId = RbacApp::query()->where('code', (string) config('ecopa.self_slug', 'asetto'))->value('id');
+
+        return UserAppAssignment::query()
+            ->where('app_id', $appId)
+            ->where('entity_id', $entityId)
+            ->where('user_id', $userId)
+            ->whereNull('revoked_at')
+            ->exists();
     }
 
     public function destroy(Asset $asset): JsonResponse
@@ -248,19 +297,34 @@ class AssetController extends Controller
     {
         $this->authorizeEntity($asset);
         $data = $request->validate([
-            'custodian_id' => ['nullable', 'string', 'exists:custodians,id'],
+            'responsible_type' => ['nullable', Rule::in(['user', 'team'])],
+            'responsible_id' => ['nullable', 'string'],
             'location' => ['nullable', 'string', 'max:255'],
             'condition_at_handover' => ['nullable', Rule::in(self::CONDITIONS)],
             'notes' => ['nullable', 'string'],
         ]);
 
-        DB::transaction(function () use ($asset, $data) {
-            // Record the handover history before mutating the asset.
+        // Validate the new responsible against the asset's entity before recording.
+        $type = $data['responsible_type'] ?? null;
+        $id = $data['responsible_id'] ?? null;
+        if ($type === 'user' && $id) {
+            abort_unless($this->userActiveInEntity($id, (string) $asset->entity_id), 422, 'User bukan anggota aktif entitas aset.');
+        } elseif ($type === 'team' && $id) {
+            abort_unless(Team::query()->whereKey($id)->where('entity_id', $asset->entity_id)->exists(), 422, 'Team bukan milik entitas aset.');
+        } else {
+            $type = null;
+            $id = null;
+        }
+
+        DB::transaction(function () use ($asset, $data, $type, $id) {
+            // Record the handover history (responsible before → after) first.
             CustodyHandover::query()->create([
                 'id' => (string) Str::ulid(),
                 'asset_id' => $asset->id,
-                'from_custodian_id' => $asset->custodian_id,
-                'to_custodian_id' => $data['custodian_id'] ?? null,
+                'from_user_id' => $asset->responsible_user_id,
+                'from_team_id' => $asset->responsible_team_id,
+                'to_user_id' => $type === 'user' ? $id : null,
+                'to_team_id' => $type === 'team' ? $id : null,
                 'from_location' => $asset->location,
                 'to_location' => $data['location'] ?? $asset->location,
                 'condition_at_handover' => $data['condition_at_handover'] ?? $asset->condition,
@@ -269,7 +333,8 @@ class AssetController extends Controller
                 'handed_at' => now(),
             ]);
 
-            $asset->custodian_id = $data['custodian_id'] ?? null;
+            $asset->responsible_user_id = $type === 'user' ? $id : null;
+            $asset->responsible_team_id = $type === 'team' ? $id : null;
             if (! empty($data['location'])) {
                 $asset->location = $data['location'];
             }
@@ -282,7 +347,7 @@ class AssetController extends Controller
         $condNote = ! empty($data['condition_at_handover']) ? " · kondisi {$data['condition_at_handover']}" : '';
         AssetAudit::log($asset->id, 'reassigned', "Tanggung jawab dilimpahkan{$condNote}.");
 
-        return response()->json(Present::asset($asset->refresh()));
+        return response()->json(Present::asset($asset->refresh()->load(['responsibleUser:id,name', 'responsibleTeam:id,name'])));
     }
 
     /** Append-only activity/audit trail for an asset (newest first). */
@@ -318,7 +383,9 @@ class AssetController extends Controller
     /** Custody delegation history for an asset (newest first). */
     public function custodyHistory(Asset $asset): JsonResponse
     {
-        $rows = $asset->custodyHandovers()->with(['fromCustodian:id,name', 'toCustodian:id,name'])->get()
+        $rows = $asset->custodyHandovers()
+            ->with(['fromCustodian:id,name', 'toCustodian:id,name', 'fromUser:id,name', 'toUser:id,name', 'fromTeam:id,name', 'toTeam:id,name'])
+            ->get()
             ->map(fn (CustodyHandover $h) => Present::custodyHandover($h));
 
         return response()->json($rows);
@@ -358,6 +425,8 @@ class AssetController extends Controller
             'serial_number' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
             'sync_akunta' => ['sometimes', 'boolean'],
+            'responsible_type' => ['sometimes', 'nullable', Rule::in(['user', 'team'])],
+            'responsible_id' => ['sometimes', 'nullable', 'string'],
         ]);
     }
 

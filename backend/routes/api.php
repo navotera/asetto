@@ -55,6 +55,7 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
         Route::get('categories', [CategoryController::class, 'index']);
         Route::get('custodians', [CustodianController::class, 'index']);
         Route::get('entities', [EntityController::class, 'index']);
+        Route::get('entities/{entity}/responsibles', [EntityController::class, 'responsibles']);
         Route::get('assets', [AssetController::class, 'index']);
         Route::get('assets/{asset}', [AssetController::class, 'show']);
         Route::get('assets/{asset}/custody-history', [AssetController::class, 'custodyHistory']);

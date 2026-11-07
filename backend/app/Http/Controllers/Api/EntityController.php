@@ -10,6 +10,7 @@ use Akunta\Rbac\Models\Role;
 use Akunta\Rbac\Models\Tenant;
 use Akunta\Rbac\Models\UserAppAssignment;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\SettingsService;
 use App\Services\UserAccessRevoker;
@@ -76,6 +77,37 @@ class EntityController extends Controller
             ->groupBy('entity_id')
             ->map(fn ($rows) => $rows->pluck('user_id')->unique()->count())
             ->all();
+    }
+
+    /**
+     * Responsible-party candidates for an entity: its active users + its teams.
+     * Accessible to anyone who can read assets of the entity (not admin-only),
+     * for the asset form / pelimpahan picker.
+     */
+    public function responsibles(Request $request, string $entity): JsonResponse
+    {
+        abort_unless(Entity::query()->whereKey($entity)->exists(), 404);
+        /** @var User $user */
+        $user = $request->user();
+        abort_unless($user->isAssettoAdmin() || $user->accessibleEntityIds()->contains($entity), 403);
+
+        $app = $this->app();
+        $users = UserAppAssignment::query()
+            ->where('app_id', $app->id)
+            ->where('entity_id', $entity)
+            ->whereNull('revoked_at')
+            ->with('user:id,name,email,disabled_at')
+            ->get()
+            ->filter(fn (UserAppAssignment $a) => $a->user && ! $a->user->disabled_at)
+            ->map(fn (UserAppAssignment $a) => ['user_id' => $a->user_id, 'name' => $a->user?->name, 'email' => $a->user?->email])
+            ->unique('user_id')
+            ->values();
+
+        $teams = Team::query()->where('entity_id', $entity)->orderBy('name')->get(['id', 'name'])
+            ->map(fn (Team $t) => ['id' => $t->id, 'name' => $t->name])
+            ->values();
+
+        return response()->json(['users' => $users, 'teams' => $teams]);
     }
 
     /** Users assigned to an entity, plus assignable Ecopa-synced users + roles. */

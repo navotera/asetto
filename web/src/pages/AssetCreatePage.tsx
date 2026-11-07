@@ -18,6 +18,7 @@ import {
   Spinner,
 } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
+import { ResponsiblePicker, type ResponsibleValue } from '@/components/ResponsiblePicker';
 import { formatIDR } from '@/lib/format';
 
 type PendingPhoto = { file: File; url: string };
@@ -45,6 +46,7 @@ export default function AssetCreatePage() {
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [syncAkunta, setSyncAkunta] = useState(true);
+  const [responsible, setResponsible] = useState<ResponsibleValue>({ type: null, id: null });
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -92,6 +94,8 @@ export default function AssetCreatePage() {
         serial_number: serialNumber || undefined,
         notes: notes || undefined,
         sync_akunta: syncAkunta,
+        responsible_type: responsible.type,
+        responsible_id: responsible.id,
       });
 
       // Upload any photos to the freshly-created asset (one request each).
@@ -153,6 +157,9 @@ export default function AssetCreatePage() {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Select>
+            </Field>
+            <Field label="Penanggung Jawab" hint="User atau Team dari entitas ini (opsional).">
+              <ResponsiblePicker entityId={entity?.id ?? null} value={responsible} onChange={setResponsible} />
             </Field>
             <Field label="Lokasi">
               <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="mis. Kantor Pusat — Lantai 3" />

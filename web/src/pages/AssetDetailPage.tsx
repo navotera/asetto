@@ -5,7 +5,6 @@ import {
   useAsset,
   useAssetPhotos,
   useCategories,
-  useCustodians,
   useDeleteAsset,
   useSetCondition,
   useCreateDisposal,
@@ -66,7 +65,6 @@ export default function AssetDetailPage() {
   const { id = '' } = useParams();
   const { data: asset, isLoading, isError } = useAsset(id);
   const { data: categories } = useCategories();
-  const { data: custodians } = useCustodians();
   const { data: photos } = useAssetPhotos(id);
   const navigate = useNavigate();
   const del = useDeleteAsset();
@@ -152,7 +150,6 @@ export default function AssetDetailPage() {
   }
 
   const categoryName = categories?.find((c) => c.id === asset.category_id)?.name ?? '—';
-  const custodian = custodians?.find((c) => c.id === asset.custodian_id);
 
   // Newest photo from the Foto tab, shown as a quick preview.
   const lastPhoto = photos && photos.length
@@ -288,7 +285,7 @@ export default function AssetDetailPage() {
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
-                  <span className="truncate font-medium">{custodian ? custodian.name : '—'}</span>
+                  <span className="truncate font-medium">{asset.responsible_name ?? '—'}</span>
                 </span>
                 <span aria-hidden="true" className="text-text-muted">·</span>
                 <ConditionBadge condition={asset.condition} />

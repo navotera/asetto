@@ -60,7 +60,6 @@ export default function AssetsPage() {
   const [tab, setTab] = useState<TabKey>('active');
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') ?? '');
   const [conditionFilter, setConditionFilter] = useState('');
-  const [custodianFilter, setCustodianFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('code');
@@ -82,7 +81,7 @@ export default function AssetsPage() {
   // Any filter/sort/search/tab change returns to the first page.
   useEffect(() => {
     setPage(1);
-  }, [search, tab, categoryFilter, conditionFilter, custodianFilter, activeEntityId, sortKey, sortDir]);
+  }, [search, tab, categoryFilter, conditionFilter, activeEntityId, sortKey, sortDir]);
 
   // Close the filter popover on outside click or Escape.
   useEffect(() => {
@@ -106,7 +105,6 @@ export default function AssetsPage() {
     category_id: categoryFilter || undefined,
     tab,
     condition: conditionFilter || undefined,
-    custodian_id: custodianFilter || undefined,
     entity_id: activeEntityId || undefined,
     sort: sortKey,
     dir: sortDir,
@@ -118,9 +116,9 @@ export default function AssetsPage() {
 
   const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? '—';
 
-  const hasFilter = !!(searchInput || categoryFilter || conditionFilter || custodianFilter);
+  const hasFilter = !!(searchInput || categoryFilter || conditionFilter);
   function resetFilters() {
-    setSearchInput(''); setSearch(''); setCategoryFilter(''); setConditionFilter(''); setCustodianFilter('');
+    setSearchInput(''); setSearch(''); setCategoryFilter(''); setConditionFilter('');
   }
 
   function toggleSort(k: SortKey) {
@@ -221,12 +219,6 @@ export default function AssetsPage() {
                       <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
                         <option value="">Semua kategori</option>
                         {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </Select>
-                    </Field>
-                    <Field label="Penanggung Jawab">
-                      <Select value={custodianFilter} onChange={(e) => setCustodianFilter(e.target.value)}>
-                        <option value="">Semua penanggung jawab</option>
-                        {custodians?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </Select>
                     </Field>
                     <Field label="Kondisi">

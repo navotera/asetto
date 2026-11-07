@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button, Field, Input, DateInput, NumberInput, Select, Textarea, Spinner, Toggle } from '@/components/ui/primitives';
-import { useCategories, useCustodians, useEntities, useSaveAsset } from '@/api/queries';
+import { useCategories, useEntities, useSaveAsset } from '@/api/queries';
 import { useToast } from '@/components/ui/toast';
+import { ResponsiblePicker, type ResponsibleValue } from '@/components/ResponsiblePicker';
 import type { Asset, DepreciationMethod } from '@/api/types';
 
 const methodLabels: Record<DepreciationMethod, string> = {
@@ -20,7 +21,6 @@ type FormState = {
   salvage_value: string;
   useful_life_months: string;
   method: DepreciationMethod;
-  custodian_id: string;
   location: string;
   serial_number: string;
   notes: string;
@@ -37,7 +37,6 @@ function toForm(asset?: Asset | null): FormState {
     salvage_value: asset ? String(asset.salvage_value) : '0',
     useful_life_months: asset ? String(asset.useful_life_months) : '60',
     method: asset?.method ?? 'straight_line',
-    custodian_id: asset?.custodian_id ?? '',
     location: asset?.location ?? '',
     serial_number: asset?.serial_number ?? '',
     notes: asset?.notes ?? '',
@@ -47,14 +46,20 @@ function toForm(asset?: Asset | null): FormState {
 
 export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClose: () => void; asset?: Asset | null }) {
   const { data: categories } = useCategories();
-  const { data: custodians } = useCustodians();
   const { data: entities } = useEntities();
   const save = useSaveAsset();
   const toast = useToast();
   const [form, setForm] = useState<FormState>(toForm(asset));
+  const [responsible, setResponsible] = useState<ResponsibleValue>({
+    type: asset?.responsible_type ?? null,
+    id: asset?.responsible_user_id ?? asset?.responsible_team_id ?? null,
+  });
 
   useEffect(() => {
-    if (open) setForm(toForm(asset));
+    if (open) {
+      setForm(toForm(asset));
+      setResponsible({ type: asset?.responsible_type ?? null, id: asset?.responsible_user_id ?? asset?.responsible_team_id ?? null });
+    }
   }, [open, asset]);
 
   // Method + useful life ALWAYS follow the chosen category (read-only fields),
@@ -91,7 +96,8 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
         salvage_value: Number(form.salvage_value) || 0,
         useful_life_months: Number(form.useful_life_months) || 1,
         method: form.method,
-        custodian_id: form.custodian_id || null,
+        responsible_type: responsible.type,
+        responsible_id: responsible.id,
         location: form.location || '—',
         serial_number: form.serial_number || undefined,
         notes: form.notes || undefined,
@@ -168,15 +174,8 @@ export function AssetFormModal({ open, onClose, asset }: { open: boolean; onClos
         <Field label="Nilai Residu (Rp)" hint="Nilai sisa di akhir masa manfaat.">
           <NumberInput value={form.salvage_value} onChange={set('salvage_value')} />
         </Field>
-        <Field label="Penanggung Jawab">
-          <Select value={form.custodian_id} onChange={set('custodian_id')}>
-            <option value="">— belum ditentukan —</option>
-            {custodians?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.type === 'person' ? 'Personil' : 'Entitas'})
-              </option>
-            ))}
-          </Select>
+        <Field label="Penanggung Jawab" hint="User atau Team dari entitas ini.">
+          <ResponsiblePicker entityId={form.entity_id || null} value={responsible} onChange={setResponsible} />
         </Field>
         <Field label="Lokasi">
           <Input value={form.location} onChange={set('location')} placeholder="mis. Kantor Pusat — Lantai 3" />

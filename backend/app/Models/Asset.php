@@ -46,6 +46,16 @@ class Asset extends Model
         return $this->belongsTo(Custodian::class, 'custodian_id');
     }
 
+    public function responsibleUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsible_user_id');
+    }
+
+    public function responsibleTeam(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'responsible_team_id');
+    }
+
     public function photos(): HasMany
     {
         return $this->hasMany(AssetPhoto::class, 'asset_id')->latest('created_at');

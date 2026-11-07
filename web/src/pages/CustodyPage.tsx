@@ -1,35 +1,34 @@
 import { useState } from 'react';
-import { useAssets, useCustodians, useReassign } from '@/api/queries';
+import { useAssets, useReassign } from '@/api/queries';
 import { PageHeader, Card, LoadingBlock, Button } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/Modal';
-import { Field, Input, Select, Spinner } from '@/components/ui/primitives';
+import { Field, Input, Spinner } from '@/components/ui/primitives';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/toast';
+import { ResponsiblePicker, type ResponsibleValue } from '@/components/ResponsiblePicker';
 import type { Asset } from '@/api/types';
 
 export default function CustodyPage() {
   const { data: assets, isLoading } = useAssets();
-  const { data: custodians } = useCustodians();
   const reassign = useReassign();
   const toast = useToast();
 
   const [target, setTarget] = useState<Asset | null>(null);
-  const [custodianId, setCustodianId] = useState('');
+  const [responsible, setResponsible] = useState<ResponsibleValue>({ type: null, id: null });
   const [location, setLocation] = useState('');
 
   const active = (assets ?? []).filter((a) => a.status === 'active');
-  const custodianName = (id: string | null) => custodians?.find((c) => c.id === id)?.name ?? '— belum ditentukan —';
 
   function open(a: Asset) {
     setTarget(a);
-    setCustodianId(a.custodian_id ?? '');
+    setResponsible({ type: a.responsible_type ?? null, id: a.responsible_user_id ?? a.responsible_team_id ?? null });
     setLocation(a.location);
   }
 
   async function submit() {
     if (!target) return;
     try {
-      await reassign.mutateAsync({ id: target.id, custodian_id: custodianId || null, location });
+      await reassign.mutateAsync({ id: target.id, responsible_type: responsible.type, responsible_id: responsible.id, location });
       toast('success', `Tanggung jawab ${target.code} dilimpahkan.`);
       setTarget(null);
     } catch {
@@ -63,7 +62,7 @@ export default function CustodyPage() {
                     <div className="font-semibold text-text-strong">{a.name}</div>
                     <div className="font-mono text-xs text-text-muted">{a.code}</div>
                   </Td>
-                  <Td>{custodianName(a.custodian_id)}</Td>
+                  <Td>{a.responsible_name ?? '—'}</Td>
                   <Td>{a.location}</Td>
                   <Td align="right">
                     <Button variant="secondary" className="px-3 py-1" onClick={() => open(a)}>Limpahkan</Button>
@@ -91,14 +90,7 @@ export default function CustodyPage() {
       >
         <div className="flex flex-col gap-4">
           <Field label="Penanggung Jawab Baru">
-            <Select value={custodianId} onChange={(e) => setCustodianId(e.target.value)}>
-              <option value="">— belum ditentukan —</option>
-              {custodians?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.type === 'person' ? 'Personil' : 'Entitas'})
-                </option>
-              ))}
-            </Select>
+            <ResponsiblePicker entityId={target?.entity_id ?? null} value={responsible} onChange={setResponsible} />
           </Field>
           <Field label="Lokasi">
             <Input value={location} onChange={(e) => setLocation(e.target.value)} />

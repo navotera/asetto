@@ -51,6 +51,12 @@ class Present
             'notes' => $asset->notes,
             'status' => $asset->status,
             'sync_akunta' => (bool) $asset->sync_akunta,
+            'responsible_user_id' => $asset->responsible_user_id,
+            'responsible_team_id' => $asset->responsible_team_id,
+            'responsible_type' => $asset->responsible_user_id ? 'user' : ($asset->responsible_team_id ? 'team' : null),
+            'responsible_name' => $asset->responsible_user_id
+                ? ($asset->relationLoaded('responsibleUser') ? $asset->responsibleUser?->name : null)
+                : ($asset->responsible_team_id ? ($asset->relationLoaded('responsibleTeam') ? $asset->responsibleTeam?->name : null) : null),
             'trashed' => $asset->trashed(),
             'accumulated_depreciation' => $withValues ? $accum : null,
             'book_value' => $withValues ? max(0.0, $cost - $accum) : null,
@@ -177,8 +183,14 @@ class Present
     /** @return array<string, mixed> */
     public static function custodyHandover(CustodyHandover $h): array
     {
+        // Unified labels across the responsible types (user / team / legacy custodian).
+        $fromName = $h->fromUser?->name ?? $h->fromTeam?->name ?? $h->fromCustodian?->name;
+        $toName = $h->toUser?->name ?? $h->toTeam?->name ?? $h->toCustodian?->name;
+
         return [
             'id' => $h->id,
+            'from_name' => $fromName,
+            'to_name' => $toName,
             'from_custodian_id' => $h->from_custodian_id,
             'from_custodian_name' => $h->fromCustodian?->name,
             'to_custodian_id' => $h->to_custodian_id,

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useCustodians, useCustodyHistory, useReassign } from '@/api/queries';
+import { useCustodyHistory, useReassign } from '@/api/queries';
 import { Card, CardHeader, Button, Field, Input, Select, Textarea, Spinner, LoadingBlock, EmptyState } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/Modal';
 import { ConditionBadge } from '@/components/ui/badges';
 import { Table, Th, Td, Tr } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/toast';
+import { ResponsiblePicker, type ResponsibleValue } from '@/components/ResponsiblePicker';
 import { formatDateTime } from '@/lib/format';
 import type { Asset, AssetCondition } from '@/api/types';
 
@@ -16,21 +17,18 @@ const CONDITIONS: { value: AssetCondition; label: string }[] = [
 ];
 
 export function CustodyPanel({ asset }: { asset: Asset }) {
-  const { data: custodians } = useCustodians();
   const { data: history, isLoading } = useCustodyHistory(asset.id);
   const reassign = useReassign();
   const toast = useToast();
 
   const [open, setOpen] = useState(false);
-  const [custodianId, setCustodianId] = useState(asset.custodian_id ?? '');
+  const [responsible, setResponsible] = useState<ResponsibleValue>({ type: null, id: null });
   const [location, setLocation] = useState(asset.location);
   const [condition, setCondition] = useState<AssetCondition>(asset.condition);
   const [notes, setNotes] = useState('');
 
-  const custodianName = (id: string | null) => custodians?.find((c) => c.id === id)?.name ?? '— belum ditentukan —';
-
   function openModal() {
-    setCustodianId(asset.custodian_id ?? '');
+    setResponsible({ type: asset.responsible_type ?? null, id: asset.responsible_user_id ?? asset.responsible_team_id ?? null });
     setLocation(asset.location);
     setCondition(asset.condition);
     setNotes('');
@@ -41,7 +39,8 @@ export function CustodyPanel({ asset }: { asset: Asset }) {
     try {
       await reassign.mutateAsync({
         id: asset.id,
-        custodian_id: custodianId || null,
+        responsible_type: responsible.type,
+        responsible_id: responsible.id,
         location,
         condition_at_handover: condition,
         notes: notes || undefined,
@@ -63,7 +62,7 @@ export function CustodyPanel({ asset }: { asset: Asset }) {
         <div className="grid grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2">
           <div>
             <div className="text-xs text-text-muted">Penanggung jawab</div>
-            <div className="text-sm font-semibold text-text-strong">{custodianName(asset.custodian_id)}</div>
+            <div className="text-sm font-semibold text-text-strong">{asset.responsible_name ?? '— belum ditentukan —'}</div>
           </div>
           <div>
             <div className="text-xs text-text-muted">Lokasi</div>
@@ -94,8 +93,8 @@ export function CustodyPanel({ asset }: { asset: Asset }) {
               {history.map((h) => (
                 <Tr key={h.id}>
                   <Td className="whitespace-nowrap text-xs text-text-muted">{formatDateTime(h.handed_at)}</Td>
-                  <Td>{h.from_custodian_name ?? '—'}</Td>
-                  <Td className="font-medium text-text-strong">{h.to_custodian_name ?? '—'}</Td>
+                  <Td>{h.from_name ?? '—'}</Td>
+                  <Td className="font-medium text-text-strong">{h.to_name ?? '—'}</Td>
                   <Td className="text-xs">{h.to_location ?? '—'}</Td>
                   <Td align="center">{h.condition_at_handover ? <ConditionBadge condition={h.condition_at_handover} /> : '—'}</Td>
                   <Td className="text-xs text-text-muted">{h.notes ?? '—'}</Td>
@@ -121,15 +120,8 @@ export function CustodyPanel({ asset }: { asset: Asset }) {
         }
       >
         <div className="flex flex-col gap-4">
-          <Field label="Penanggung Jawab Baru">
-            <Select value={custodianId} onChange={(e) => setCustodianId(e.target.value)}>
-              <option value="">— belum ditentukan —</option>
-              {custodians?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.type === 'person' ? 'Personil' : 'Entitas'})
-                </option>
-              ))}
-            </Select>
+          <Field label="Penanggung Jawab Baru" hint="User atau Team dari entitas aset ini.">
+            <ResponsiblePicker entityId={asset.entity_id} value={responsible} onChange={setResponsible} />
           </Field>
           <Field label="Lokasi">
             <Input value={location} onChange={(e) => setLocation(e.target.value)} />

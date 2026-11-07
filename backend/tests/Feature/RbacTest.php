@@ -110,10 +110,8 @@ it('plain user is blocked from the asset list and management but can see Aset Sa
     $this->getJson('/api/assets')->assertStatus(403);
     $this->postJson('/api/assets', ['name' => 'X', 'acquisition_date' => '2026-01-01', 'acquisition_cost' => 1])->assertStatus(403);
 
-    // Link a custodian to this user and give them an asset.
-    $cust = Custodian::query()->where('code', 'EMP-0012')->first();
-    $cust->update(['user_id' => $u->id]);
-    Asset::query()->where('code', 'AST-0001')->update(['custodian_id' => $cust->id]);
+    // Make this user the responsible party of an asset → it shows in "Aset Saya".
+    Asset::query()->where('code', 'AST-0001')->update(['responsible_user_id' => $u->id]);
 
     $this->getJson('/api/assets/mine')
         ->assertOk()

@@ -97,6 +97,24 @@ const entityTeamsData = (entityId: string) => ({
   teams: teams.filter((t) => t.entity_id === entityId).map(presentTeam),
   entity_users: entityActiveUsers(entityId),
 });
+const entityResponsibles = (entityId: string) => ({
+  users: entityActiveUsers(entityId),
+  teams: teams.filter((t) => t.entity_id === entityId).map((t) => ({ id: t.id, name: t.name })),
+});
+const responsibleName = (type: string | null, rid: string | null): string | null => {
+  if (type === 'user' && rid) return syncedMembers.find((m) => m.user_id === rid)?.name ?? rid;
+  if (type === 'team' && rid) return teams.find((t) => t.id === rid)?.name ?? rid;
+  return null;
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyResponsibleMock(asset: any, type: unknown, rid: unknown) {
+  const t = type === 'user' || type === 'team' ? type : null;
+  const id = typeof rid === 'string' && rid ? rid : null;
+  asset.responsible_user_id = t === 'user' ? id : null;
+  asset.responsible_team_id = t === 'team' ? id : null;
+  asset.responsible_type = asset.responsible_user_id ? 'user' : asset.responsible_team_id ? 'team' : null;
+  asset.responsible_name = responsibleName(asset.responsible_type, asset.responsible_user_id ?? asset.responsible_team_id);
+}
 
 /** Readable, unique entity id derived from the name — mirrors the backend. */
 function entitySlugId(name: string): string {
@@ -793,6 +811,7 @@ export const db = {
   },
 
   // --- teams ---
+  entityResponsibles: (entityId: string) => entityResponsibles(entityId),
   entityTeams: (entityId: string) => entityTeamsData(entityId),
   createTeam(entityId: string, name: string) {
     teams.push({ id: id('team'), entity_id: entityId, name: String(name || 'Team Baru').trim() || 'Team Baru', members: [] });
@@ -934,7 +953,7 @@ export const db = {
   },
   getAsset: (assetId: string) => assets.find((a) => a.id === assetId) ?? null,
 
-  createAsset(input: Partial<Asset>): Asset {
+  createAsset(input: Partial<Asset> & { responsible_type?: unknown; responsible_id?: unknown }): Asset {
     const n = assets.length + 1;
     const asset = seedAsset({
       id: id('ast'),
@@ -954,6 +973,7 @@ export const db = {
       notes: input.notes,
       sync_akunta: input.sync_akunta ?? true,
     });
+    applyResponsibleMock(asset, input.responsible_type, input.responsible_id);
     assets.push(asset);
     auditPush(asset.id, 'created', 'Aset dibuat.');
     return asset;
@@ -1003,10 +1023,12 @@ export const db = {
     return { committed: true, created, skipped: summary.invalid, summary, rows: results };
   },
 
-  updateAsset(assetId: string, input: Partial<Asset>): Asset {
+  updateAsset(assetId: string, input: Partial<Asset> & { responsible_type?: unknown; responsible_id?: unknown }): Asset {
     const asset = assets.find((a) => a.id === assetId);
     if (!asset) throw new ApiMockError(404, 'Aset tidak ditemukan');
-    Object.assign(asset, input);
+    const { responsible_type, responsible_id, ...rest } = input;
+    Object.assign(asset, rest);
+    if (responsible_type !== undefined) applyResponsibleMock(asset, responsible_type, responsible_id);
     asset.book_value = asset.acquisition_cost - asset.accumulated_depreciation;
     auditPush(asset.id, 'updated', 'Data aset diperbarui.');
     return asset;
@@ -1039,17 +1061,16 @@ export const db = {
     return asset;
   },
 
-  reassign(assetId: string, body: { custodian_id?: string | null; location?: string; condition_at_handover?: Asset['condition']; notes?: string }): Asset {
-    const asset = assets.find((a) => a.id === assetId);
+  reassign(assetId: string, body: { responsible_type?: 'user' | 'team' | null; responsible_id?: string | null; location?: string; condition_at_handover?: Asset['condition']; notes?: string }): Asset {
+    const asset = assets.find((a) => a.id === assetId) as any;
     if (!asset) throw new ApiMockError(404, 'Aset tidak ditemukan');
 
-    const custodianId = body.custodian_id ?? null;
+    const fromName = responsibleName(asset.responsible_type ?? null, asset.responsible_user_id ?? asset.responsible_team_id ?? null);
+    const toName = responsibleName(body.responsible_type ?? null, body.responsible_id ?? null);
     (custodyHistory[assetId] ??= []).push({
       id: id('hov'),
-      from_custodian_id: asset.custodian_id,
-      from_custodian_name: custodianNameById(asset.custodian_id),
-      to_custodian_id: custodianId,
-      to_custodian_name: custodianNameById(custodianId),
+      from_name: fromName,
+      to_name: toName,
       from_location: asset.location,
       to_location: body.location ?? asset.location,
       condition_at_handover: body.condition_at_handover ?? asset.condition,
@@ -1057,7 +1078,7 @@ export const db = {
       handed_at: new Date().toISOString(),
     });
 
-    asset.custodian_id = custodianId;
+    applyResponsibleMock(asset, body.responsible_type ?? null, body.responsible_id ?? null);
     if (body.location) asset.location = body.location;
     if (body.condition_at_handover) asset.condition = body.condition_at_handover;
     auditPush(assetId, 'reassigned', `Tanggung jawab dilimpahkan${body.condition_at_handover ? ` · kondisi ${body.condition_at_handover}` : ''}.`);

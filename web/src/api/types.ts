@@ -106,6 +106,12 @@ export interface EntityTeamsData {
   entity_users: AssignableUser[];
 }
 
+/** Responsible-party candidates for an entity (asset form / pelimpahan picker). */
+export interface ResponsiblesData {
+  users: AssignableUser[];
+  teams: { id: string; name: string }[];
+}
+
 export interface Custodian {
   id: string;
   type: CustodianType;
@@ -137,6 +143,11 @@ export interface Asset {
   status: AssetStatus;
   /** Whether this asset's economic events are synced to the Akunta queue. */
   sync_akunta: boolean;
+  /** Responsible party: a user OR a team (exactly one, or none). */
+  responsible_user_id?: string | null;
+  responsible_team_id?: string | null;
+  responsible_type?: 'user' | 'team' | null;
+  responsible_name?: string | null;
   /** True when the asset is soft-deleted (shown in the "Trashed" tab). */
   trashed?: boolean;
   /** Derived, kept denormalised for list views. */
@@ -329,6 +340,9 @@ export interface MyAsset {
 
 export interface CustodyHandover {
   id: string;
+  /** Unified responsible labels (user/team/legacy custodian). */
+  from_name: string | null;
+  to_name: string | null;
   from_custodian_id: string | null;
   from_custodian_name: string | null;
   to_custodian_id: string | null;

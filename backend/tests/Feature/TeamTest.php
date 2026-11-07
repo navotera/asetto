@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Akunta\Rbac\Models\App as RbacApp;
 use Akunta\Rbac\Models\Role;
 use Akunta\Rbac\Models\UserAppAssignment;
+use App\Models\Asset;
 use App\Models\Team;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -71,6 +72,19 @@ it('refuses a member who is not active in the entity', function () {
 
     $this->postJson("/api/teams/{$team->id}/members", ['user_id' => $outsider->id])
         ->assertStatus(422);
+});
+
+it('shows a team-held asset in the member\'s Aset Saya', function () {
+    $team = Team::query()->create(['entity_id' => $this->entityId, 'name' => 'Tim C']);
+    $u = memberUser($this->entityId, 'citra@example.com');
+    $team->members()->attach($u->id);
+
+    $asset = Asset::query()->where('entity_id', $this->entityId)->first();
+    $asset->update(['responsible_team_id' => $team->id, 'responsible_user_id' => null]);
+
+    // Act as the team member (operator role → has asset.read_own).
+    $this->withSession(['ecopa.app_role' => 'user'])->actingAs($u->fresh());
+    $this->getJson('/api/assets/mine')->assertOk()->assertJsonFragment(['id' => $asset->id]);
 });
 
 it('renames and deletes a team', function () {
